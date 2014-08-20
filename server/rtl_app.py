@@ -1,0 +1,132 @@
+#from ossie.utils import redhawk
+#from ossie.utils.redhawk.channels import ODMListener
+import collections
+import threading
+
+class BadDemodException(Exception):
+
+    def __init__(self, demod):
+        Exception.__init__(self, "Bad demodulator '%s'" % demod)
+        self.demod = demod
+
+class BadFrequencyException(Exception):
+
+    def __init__(self, frequency):
+        Exception.__init__(self, "Bad frequency %s" % frequency)
+        self.frequency = frequency
+
+class MockRTLApp(object):
+    SURVEY_DEMOD_LIST = [ "fm" ]
+
+    FREQUENCY_RANGE = [1000000, 900000000]
+
+    def __init__(self, domainname):
+        self._domainname = domainname
+
+        self._event_condition = threading.Condition()
+        self._event_queue = collections.deque()
+        self._survey = dict(frequency=None, demod=None)
+        self._device = dict(type='rtl', status='unavailable')
+
+
+    def get_survey(self):
+        '''
+            Return the survey properties.  A dictionary of the frequency and demodulator
+            self.get_survey()
+            {
+                frequency: 101.0
+                demod: "fm"
+            }
+        '''
+        # FIXME: Connect with FrontEnd device and processing mode
+        return self._survey
+
+    def set_survey(self, frequency, demod):
+        '''
+             Sets the survey properties.  Returns the new processing values.
+
+             Raises:
+                 ValueError() if a bad frequency.
+                 ProcessingError() if a bad demodulator
+        '''
+        if demod not in self.SURVEY_DEMOD_LIST:
+            raise BadDemodException(demod)
+
+        if frequency < self.FREQUENCY_RANGE[0] or frequency > self.FREQUENCY_RANGE[1]:
+            raise BadFrequencyException(frequency)
+
+        self._survey = dict(frequency=int(frequency), demod=demod)
+        self._post_event('survey', self._survey)
+        return self._survey
+
+    def stop_survey(self):
+        self._survey = dict(frequency=None, demod=None)
+        self._post_event('survey', self._survey)
+        return self._survey
+
+
+    def get_device(self):
+        '''
+            Gets current device settings as a dictionary.
+
+            Unavailable RTL device:
+            {
+                'type': 'rtl',
+                'status': 'unavailable'
+            }
+
+            Ready RTL device:
+            {
+                'type': 'rtl',
+                'status': 'ready'
+            }
+
+        '''
+        return self._device
+
+    def next_event(self, timeout=0):
+        '''
+            Thread safe method for returning the next event
+            available.  Returns the next event or a None if no event is available
+
+            Possible events:
+                 {
+                     'type': 'survey-change'
+                     'body': { ... }
+                 }
+
+
+                 {
+                     'type': 'device-change'
+                     'body': { ... }
+                 }
+        '''
+        self._event_condition.acquire()
+        try:
+            if not self._event_queue and timeout > 0:
+                self._event_condition.wait(timeout)
+
+            try:
+                return self._event_queue.popleft()
+            except IndexError:
+                return None
+        finally:
+            self._event_condition.release()
+
+
+
+    def _post_event(self, etype, body):
+        ''' 
+            Internal method to post a new event
+        '''
+
+        self._event_condition.acquire()
+        try:
+            self._event_queue.append(dict(type=etype, body=body))
+            self._event_condition.notify()
+        finally:
+            self._event_condition.release()
+
+    def _set_device(self, dtype, status):
+        self._device = dict(type=dtype, status=status)
+        self._post_event('device', self._device)

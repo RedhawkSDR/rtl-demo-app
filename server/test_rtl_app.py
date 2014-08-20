@@ -1,0 +1,53 @@
+#!/usr/bin/env python
+import unittest
+
+import rtl_app
+
+class RTLAppTest(unittest.TestCase):
+
+
+	def test_survey(self):
+		rtl = rtl_app.MockRTLApp("domain")
+		a = rtl.get_survey()
+		self.assertEquals(None, a['demod'])
+		self.assertEquals(None, a['frequency'])
+		a = rtl.set_survey(frequency=101100000, demod='fm')
+		self.assertEquals('fm', a['demod'])
+		self.assertEquals(101100000, a['frequency'])
+		a = rtl.get_survey()
+		self.assertEquals('fm', a['demod'])
+		self.assertEquals(101100000, a['frequency'])
+		try:
+			a = rtl.set_survey(frequency=100, demod='fm')
+			self.fail("expected bad frequency error")
+		except rtl_app.BadFrequencyException, e:
+			self.assertEquals("Bad frequency 100", e.message)
+
+		try:
+			a = rtl.set_survey(frequency=101100000, demod='nutrino')
+			self.fail("expected bad frequency error")
+		except rtl_app.BadDemodException, e:
+			self.assertEquals("Bad demodulator 'nutrino'", e.message)
+
+		a = rtl.stop_survey()
+		self.assertEquals(None, a['demod'])
+		self.assertEquals(None, a['frequency'])
+
+		e = rtl.next_event(timeout=1)
+		a = e['body']
+		self.assertEquals(e['type'], 'survey')
+		self.assertEquals('fm', a['demod'])
+		self.assertEquals(101100000, a['frequency'])
+		e = rtl.next_event(timeout=1)
+		a = e['body']
+		self.assertEquals(e['type'], 'survey')
+		self.assertEquals(None, a['demod'])
+		self.assertEquals(None, a['frequency'])
+		e = rtl.next_event(timeout=.5)
+		self.assertEquals(None, e)
+		e = rtl.next_event()
+		self.assertEquals(None, e)
+
+
+if __name__ == '__main__':
+	unittest.main()

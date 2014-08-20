@@ -23,6 +23,7 @@ staticdir = os.path.join(os.path.dirname(__import__(__name__).__file__), 'static
 
 class MainHandler(RequestHandler):
 
+# This is a sample of a coroutine
     @gen.coroutine
     def get(self):
         http_client = AsyncHTTPClient()
@@ -33,7 +34,24 @@ class MainHandler(RequestHandler):
         #do_something_with_response(response)
         self.write("template.html")
 
-class SurveyHandler(RequestHandler): pass
+class RTLAppHandler(RequestHandler):
+    def initialize(self, rtl_app):
+        self.rtl_app = rtl_app
+
+class SurveyHandler(RequestHandler):
+
+    def get(self):
+        yield gen.Task()
+        self.write(dict(frequency=self.rtl_app.get_frequency(),
+                        processing=self.rtl_app.get_processing())
+
+    @gen.coroutine
+    def post(self, frequency, processing):
+        self.rtl_app.set_processing(frequency, processing)
+        self.write(dict(frequency=rtl_app.get_frequency(),
+                        processing=rtl_app.get_processing())
+
+
 class DeviceHandler(RequestHandler): pass
 class StatusHandler(RequestHandler): 
     def get(self):
@@ -45,15 +63,15 @@ class StatusHandler(RequestHandler):
         
 class AudioWebSocketHandler(RequestHandler): pass
 
-def get_application():
+def get_application(rtl_app):
     application = tornado.web.Application([
     (r"/", MainHandler),
     (r"/static/(.*)", tornado.web.StaticFileHandler, {"path": staticdir}),
 
-    (r"/survey", SurveyHandler),
-    (r"/device", DeviceHandler),
-    (r"/output/audio", AudioWebSocketHandler),
-    (r"/status", StatusHandler)
+    (r"/survey", SurveyHandler, dict(rtl_app=rtl_app)),
+    (r"/device", DeviceHandler, dict(rtl_app=rtl_app)),
+    (r"/output/audio", AudioWebSocketHandler, dict(rtl_app=rtl_app)),
+    (r"/status", StatusHandler, dict(rtl_app=rtl_app))
 ], debug=options.debug)
 
     return application
