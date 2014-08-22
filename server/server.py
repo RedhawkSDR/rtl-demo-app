@@ -39,11 +39,11 @@ class MainHandler(web.RequestHandler):
         #do_something_with_response(response)
         self.write("template.html")
 
-class RTLAppHandler(web.RequestHandler):
+class _RTLAppHandler(web.RequestHandler):
     def initialize(self, rtl_app):
         self.rtl_app = rtl_app
 
-class SurveyHandler(RTLAppHandler):
+class SurveyHandler(_RTLAppHandler):
 
     @gen.coroutine
     def _get_survey(self, callback=None):
@@ -79,10 +79,29 @@ class SurveyHandler(RTLAppHandler):
     def post(self):
         logging.debug("Survey POST")
         data = json.loads(self.request.body)
-        res = yield self._set_survey(data)
-        self.write(dict(frequency=res['frequency'],
-                        processing=res['demod']))
+        try:
+            res = yield self._set_survey(data)
+            self.write(dict(success=True,
+                            status=dict(frequency=res['frequency'],
+                                        processing=res['demod'])))
+        except rtl_app.BadFrequencyException:
+            self.set_status(400)
+            self.write(dict(success=False,
+                            error='Frequency is invalid',
+                            request=data))
+        except rtl_app.BadDemodException:
+            self.set_status(405)
+            self.write(dict(success=False,
+                            error="'%s' is not a valid processor" % data['processing'],
+                            request=data))
 
+        except Exception:
+            logging.exception("Error setting survey")
+            self.set_status(500)
+            self.write(dict(success=False,
+                            error='An unknown system error occurred',
+                            request=data))
+        
     @gen.coroutine
     def delete(self):
         logging.debug("Survey POST")
@@ -91,8 +110,8 @@ class SurveyHandler(RTLAppHandler):
                         processing=res['demod']))
 
 
-class DeviceHandler(RTLAppHandler): pass
-class StatusHandler(RTLAppHandler): 
+class DeviceHandler(_RTLAppHandler): pass
+class StatusHandler(_RTLAppHandler): 
     def get(self):
         self.write({
           "url": "/survey",
@@ -100,7 +119,7 @@ class StatusHandler(RTLAppHandler):
           }
         })
         
-class AudioWebSocketHandler(RTLAppHandler): pass
+class AudioWebSocketHandler(_RTLAppHandler): pass
 
 def get_application(rtl_app):
     application = tornado.web.Application([

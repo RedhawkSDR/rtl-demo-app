@@ -48,12 +48,14 @@ class RESTfulTest(AsyncHTTPTestCase, LogTrapTestCase):
         # values should be identical
         self.assertEquals(200, response.code)
         data = json.loads(response.buffer.getvalue())
-        self.assertEquals(pdata, data)
+        self.assertTrue(data['success'])
+        self.assertEquals(pdata, data['status'])
 
         # getting the survey should be equal too
         self.http_client.fetch(self.get_url('/survey'), self.stop)
         response = self.wait()
         self.assertEquals(200, response.code)
+        data = json.loads(response.buffer.getvalue())
         self.assertEquals(pdata, data)
 
     def test_survey_delete(self):
@@ -80,6 +82,53 @@ class RESTfulTest(AsyncHTTPTestCase, LogTrapTestCase):
         self.assertEquals(200, response.code)
         self.assertEquals(None, data['frequency'])
         self.assertEquals(None, data['processing'])
+
+    def test_survey_post_errors(self):
+        request = dict(frequency=10, processing='fm')
+        # Frequency too low
+        self.http_client.fetch(
+            HTTPRequest(self.get_url('/survey'), 'POST', 
+                        body=json.dumps(request)),
+                        self.stop)
+        response = self.wait()
+
+        self.assertEquals(400, response.code)
+        data = json.loads(response.buffer.getvalue())
+        self.assertFalse(data['success'])
+        self.assertEquals('Frequency is invalid', data['error'])
+        self.assertEquals(request, data['request'])
+
+        # frequency too high
+        request = dict(frequency=10e20, processing='fm')
+        self.http_client.fetch(
+            HTTPRequest(self.get_url('/survey'), 'POST', 
+                        body=json.dumps(request)),
+                        self.stop)
+        response = self.wait()
+
+        # values should be identical
+        self.assertEquals(400, response.code)
+        data = json.loads(response.buffer.getvalue())
+        self.assertFalse(data['success'])
+        self.assertEquals('Frequency is invalid', data['error'])
+        self.assertEquals(request, data['request'])
+
+        # bad processor
+        badprocessor = 'FKJFKDJFK'
+        request = dict(frequency=99500000, processing=badprocessor)
+        self.http_client.fetch(
+            HTTPRequest(self.get_url('/survey'), 'POST', 
+                        body=json.dumps(request)),
+                        self.stop)
+        response = self.wait()
+
+        # values should be identical
+        self.assertEquals(405, response.code)
+        data = json.loads(response.buffer.getvalue())
+        self.assertFalse(data['success'])
+        self.assertEquals("'%s' is not a valid processor" % badprocessor, data['error'])
+        self.assertEquals(request, data['request'])
+
 
 if __name__ == '__main__':
 
