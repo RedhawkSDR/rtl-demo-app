@@ -1,14 +1,18 @@
 #!/usr/bin/env python
 
+# system imports
 import unittest
-from mockito import mock, verify
+import json
+import logging
+
+# tornado imports
 import tornado.testing
 from tornado.testing import AsyncHTTPTestCase, LogTrapTestCase
 from tornado.httpclient import HTTPRequest
+
+# application imports
 import server
 import rtl_app
-import json
-import logging
 
 # all method returning suite is required by tornado.testing.main()
 def all():
@@ -20,10 +24,6 @@ class RESTfulTest(AsyncHTTPTestCase, LogTrapTestCase):
         return server.get_application(rtl_app.MockRTLApp('REDHAWK_DEV'))
 
     def test_survey_get(self):
-        # The following two lines are equivalent to
-        #   response = self.fetch('/')
-        # but are shown in full here to demonstrate explicit use
-        # of self.stop and self.wait.
         self.http_client.fetch(self.get_url('/survey'), self.stop)
         response = self.wait()
         self.assertEquals(200, response.code)
@@ -61,9 +61,10 @@ class RESTfulTest(AsyncHTTPTestCase, LogTrapTestCase):
     def test_survey_delete(self):
 
         pdata = dict(frequency=107500000, processing='fm')
-        # run the post tests
+        # run the post tests to set some values
         self.test_survey_post(pdata=pdata)
 
+        # now stop the processing
         self.http_client.fetch(
             HTTPRequest(self.get_url('/survey'), 'DELETE'), 
                         self.stop)
@@ -73,13 +74,15 @@ class RESTfulTest(AsyncHTTPTestCase, LogTrapTestCase):
         # values should be identical
         self.assertEquals(200, response.code)
         data = json.loads(response.buffer.getvalue())
-        self.assertEquals(None, data['frequency'])
-        self.assertEquals(None, data['processing'])
+        self.assertEquals(True, data['success'])
+        self.assertEquals(None, data['status']['frequency'])
+        self.assertEquals(None, data['status']['processing'])
 
         # getting the survey should be equal too
         self.http_client.fetch(self.get_url('/survey'), self.stop)
         response = self.wait()
         self.assertEquals(200, response.code)
+        data = json.loads(response.buffer.getvalue())
         self.assertEquals(None, data['frequency'])
         self.assertEquals(None, data['processing'])
 

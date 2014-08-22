@@ -105,9 +105,17 @@ class SurveyHandler(_RTLAppHandler):
     @gen.coroutine
     def delete(self):
         logging.debug("Survey POST")
-        res = yield self._delete_survey()
-        self.write(dict(frequency=res['frequency'],
-                        processing=res['demod']))
+        try:
+            res = yield self._delete_survey()
+            self.write(dict(success=True,
+                            status=dict(frequency=res['frequency'],
+                                        processing=res['demod'])))
+        except Exception:
+            logging.exception("Error stopping survey")
+            self.set_status(500)
+            self.write(dict(success=False,
+                            error='An unknown system error occurred',
+                            request=data))
 
 
 class DeviceHandler(_RTLAppHandler): pass
