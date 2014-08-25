@@ -21,7 +21,10 @@ def all():
 class RESTfulTest(AsyncHTTPTestCase, LogTrapTestCase):
 
     def get_app(self):
-        return server.get_application(rtl_app.MockRTLApp('REDHAWK_DEV'))
+        # renewed each test case
+        self._mock_device = rtl_app.MockRTLApp('REDHAWK_DEV')
+        print "GET APP %s" % id(self._mock_device)
+        return server.get_application(self._mock_device)
 
     def test_survey_get(self):
         self.http_client.fetch(self.get_url('/survey'), self.stop)
@@ -131,6 +134,17 @@ class RESTfulTest(AsyncHTTPTestCase, LogTrapTestCase):
         self.assertFalse(data['success'])
         self.assertEquals("'%s' is not a valid processor" % badprocessor, data['error'])
         self.assertEquals(request, data['request'])
+
+    # fixme: does not work yet
+    def _test_device_get(self):
+        self.http_client.fetch(self.get_url('/device'), self.stop)
+        response = self.wait()
+        self.assertEquals(200, response.code)
+        # get the json reply
+        data = json.loads(response.buffer.getvalue())
+        self.assertEquals('rtl', data['type'])
+        self.assertEquals('ready', data['status'])
+
 
 
 if __name__ == '__main__':

@@ -1,13 +1,14 @@
 #!/usr/bin/env python
 import unittest
-
+import sys
 import rtl_app
 
 class RTLAppTest(unittest.TestCase):
 
 
-	def test_survey(self):
-		rtl = rtl_app.MockRTLApp("domain")
+	def test_survey(self, rtl=None):
+		if not rtl:
+			rtl = rtl_app.MockRTLApp("domain")
 		a = rtl.get_survey()
 		self.assertEquals(None, a['demod'])
 		self.assertEquals(None, a['frequency'])
@@ -47,6 +48,9 @@ class RTLAppTest(unittest.TestCase):
 		self.assertEquals(None, e)
 		e = rtl.next_event()
 		self.assertEquals(None, e)
+
+	def test_survey_delay(self):
+		self.test_survey(rtl_app.MockRTLApp("domain", lambda f: sys.stdout.write("Func %s\n" % f)))
 
 
 if __name__ == '__main__':

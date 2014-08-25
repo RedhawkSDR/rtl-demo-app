@@ -4,6 +4,7 @@
 import json
 import os,sys
 import logging
+import time
 
 # third party imports
 import tornado.ioloop
@@ -70,7 +71,7 @@ class SurveyHandler(_RTLAppHandler):
     @web.asynchronous
     @gen.coroutine
     def get(self):
-        logging.debug("Survey GET")
+        logging.info("Survey GET")
         res = yield self._get_survey()
         self.write(dict(frequency=res['frequency'],
                         processing=res['demod']))
@@ -119,6 +120,8 @@ class SurveyHandler(_RTLAppHandler):
 
 
 class DeviceHandler(_RTLAppHandler): pass
+
+
 class StatusHandler(_RTLAppHandler): 
     def get(self):
         self.write({
@@ -149,8 +152,14 @@ def get_application(rtl_app):
 if __name__ == '__main__':
 
     # parse the command line
+    define("mock", default=False, type=bool, help="Run with the mock application back end")
+    define("delay", default=0, type=int, help="Mock delay in milliseconds")
     tornado.options.parse_command_line()
-    rtlapp = rtl_app.MockRTLApp(options.domain)
+    if options.mock:
+        rtlapp = rtl_app.MockRTLApp(options.domain, 
+                                    delayfunc=lambda f: time.sleep(options.delay))
+    else:
+        raise ValueError('Mock is required')
     application = get_application(rtlapp)
     application.listen(options.port)
     tornado.ioloop.IOLoop.instance().start()

@@ -2,6 +2,8 @@
 #from ossie.utils.redhawk.channels import ODMListener
 import collections
 import threading
+import time
+from functools import wraps
 
 class BadDemodException(Exception):
 
@@ -15,20 +17,33 @@ class BadFrequencyException(Exception):
         Exception.__init__(self, "Bad frequency %s" % frequency)
         self.frequency = frequency
 
+def _delay(func):
+
+    @wraps(func)
+    def do_delay(self, *args, **kwargs):
+        self._delayfunc(func)
+        return func(self, *args, **kwargs)
+    return do_delay
+
 class MockRTLApp(object):
     SURVEY_DEMOD_LIST = [ "fm" ]
 
     FREQUENCY_RANGE = [1000000, 900000000]
 
-    def __init__(self, domainname):
+    def __init__(self, domainname, delayfunc=lambda meth: None):
+        '''
+              The delay function is invoked during a call.
+        '''
         self._domainname = domainname
 
         self._event_condition = threading.Condition()
         self._event_queue = collections.deque()
         self._survey = dict(frequency=None, demod=None)
         self._device = dict(type='rtl', status='unavailable')
+        self._delayfunc = delayfunc
 
 
+    @_delay
     def get_survey(self):
         '''
             Return the survey properties.  A dictionary of the frequency and demodulator
@@ -41,6 +56,7 @@ class MockRTLApp(object):
         # FIXME: Connect with FrontEnd device and processing mode
         return self._survey
 
+    @_delay
     def set_survey(self, frequency, demod):
         '''
              Sets the survey properties.  Returns the new processing values.
@@ -59,12 +75,14 @@ class MockRTLApp(object):
         self._post_event('survey', self._survey)
         return self._survey
 
+    @_delay
     def stop_survey(self):
         self._survey = dict(frequency=None, demod=None)
         self._post_event('survey', self._survey)
         return self._survey
 
 
+    @_delay
     def get_device(self):
         '''
             Gets current device settings as a dictionary.
@@ -84,6 +102,7 @@ class MockRTLApp(object):
         '''
         return self._device
 
+    @_delay
     def next_event(self, timeout=0):
         '''
             Thread safe method for returning the next event
@@ -112,8 +131,6 @@ class MockRTLApp(object):
                 return None
         finally:
             self._event_condition.release()
-
-
 
     def _post_event(self, etype, body):
         ''' 
