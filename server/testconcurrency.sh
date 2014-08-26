@@ -1,7 +1,7 @@
 #!/bin/sh
 
 url=http://localhost:8888/survey
-n=50
+n=500
 i=0
 date1=`date +"%s"`
 while [ $i -lt $n ] ; do
@@ -14,3 +14,5 @@ date2=`date +"%s"`
 diff=$((date2-date1))
 echo "Fork took $diff seconds"
 wait
+date2=`date +"%s"`
+echo "Tests took $diff seconds"

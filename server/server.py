@@ -1,16 +1,21 @@
 #!/usr/bin/env python
 
+# do this as early as possible in your application
+from gevent import monkey; monkey.patch_all()
+
 # system imports
 import json
 import os,sys
 import logging
 import time
+import functools
 
 # third party imports
 import tornado.ioloop
 from tornado.httpclient import AsyncHTTPClient
 from tornado import web
 from tornado import gen
+import gevent
 
 # application imports
 import rtl_app
@@ -26,6 +31,24 @@ define("debug", default=False, type=bool, help="Enable Tornado debug mode.  Relo
 
 # establish static directory from this module
 staticdir = os.path.join(os.path.dirname(__import__(__name__).__file__), 'static')
+
+def _background(f):
+    '''
+        Places a task in the background using gevent.
+        Note that @web.asynchronous must be outside of this
+        decorator
+    '''
+    @functools.wraps(f)
+    def task(self, *args, **kwargs):        
+        logging.info('Entering %s' % f)
+
+        def background_task(self, *args, **kwargs):
+            try:
+                f(self, *args, **kwargs)
+            finally:
+                self.finish()
+        gevent.spawn(background_task, self, *args, **kwargs)
+    return task
 
 class MainHandler(web.RequestHandler):
 
@@ -46,22 +69,23 @@ class _RTLAppHandler(web.RequestHandler):
 
 class SurveyHandler(_RTLAppHandler):
 
-    @gen.coroutine
+#    @web.asynchronous
     def _get_survey(self, callback=None):
         logging.info("start get survey")
         rtn = self.rtl_app.get_survey()
         rtn['availableProcessing'] = self.rtl_app.get_processing_list()
         logging.info("done get_suvery")
-        return rtn
+        callback(rtn)
+        #return rtn
 
-    @gen.coroutine
+ #   @web.asynchronous
     def _set_survey(self, data, callback=None):
         logging.info("start set survey")
         rtn = self.rtl_app.set_survey(frequency=data['frequency'], demod=data['processing'])
         logging.info("done set_suvery")
         return rtn
 
-    @gen.coroutine
+ #   @web.asynchronous
     def _delete_survey(self, callback=None):
         logging.info("start delete survey")
         rtn = self.rtl_app.stop_survey()
@@ -70,7 +94,7 @@ class SurveyHandler(_RTLAppHandler):
 
 
     @web.asynchronous
-    @gen.coroutine
+    @_background
     def get(self):
         logging.info("Survey GET")
         res = yield self._get_survey()
@@ -78,12 +102,13 @@ class SurveyHandler(_RTLAppHandler):
                         processing=res['demod'],
                         availableProcessing=res['availableProcessing']))
 
-    @gen.coroutine
+    @web.asynchronous
+    @_background
     def post(self):
         logging.debug("Survey POST")
         data = json.loads(self.request.body)
         try:
-            res = yield self._set_survey(data)
+            res = self.rtl_app.set_survey(frequency=data['frequency'], demod=data['processing'])
             self.write(dict(success=True,
                             status=dict(frequency=res['frequency'],
                                         processing=res['demod'])))
@@ -105,11 +130,12 @@ class SurveyHandler(_RTLAppHandler):
                             error='An unknown system error occurred',
                             request=data))
         
-    @gen.coroutine
+    @web.asynchronous
+    @_background
     def delete(self):
         logging.debug("Survey POST")
         try:
-            res = yield self._delete_survey()
+            res = self.rtl_app.stop_survey()
             self.write(dict(success=True,
                             status=dict(frequency=res['frequency'],
                                         processing=res['demod'])))
