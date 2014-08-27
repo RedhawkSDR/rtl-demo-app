@@ -173,7 +173,29 @@ class SurveyHandler(_RTLAppHandler):
         _exec_background(task, callback=callback, ioloop=self.ioloop)
 
 
-class DeviceHandler(_RTLAppHandler): pass
+class DeviceHandler(_RTLAppHandler):
+    @web.asynchronous
+    def get(self):
+        logging.info("Device GET")
+        def task():
+            return self.rtl_app.get_device()
+
+        def callback(data, error):
+            try:
+                if error:
+                    raise error
+                
+                self.write(data)                
+            except Exception:
+                logging.exception("Error getting device")
+                self.set_status(500)
+                self.write(dict(success=False,
+                                error='An unknown system error occurred'))
+
+            self.finish()
+            logging.info("Survey DELETE End")
+
+        _exec_background(task, callback=callback, ioloop=self.ioloop)
 
 
 class StatusHandler(_RTLAppHandler): 

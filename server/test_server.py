@@ -166,7 +166,16 @@ class RESTfulTest(AsyncHTTPTestCase, LogTrapTestCase):
 
 
     # fixme: does not work yet
-    def _test_device_get(self):
+    def test_device_get(self):
+        AsyncHTTPClient(self.io_loop).fetch(self.get_url('/device'), self.stop)
+        response = self.wait()
+        self.assertEquals(200, response.code)
+        # get the json reply
+        data = json.loads(response.buffer.getvalue())
+        self.assertEquals('rtl', data['type'])
+        self.assertEquals('unavailable', data['status'])
+
+        self._mock_device._set_device('rtl', 'ready')
         AsyncHTTPClient(self.io_loop).fetch(self.get_url('/device'), self.stop)
         response = self.wait()
         self.assertEquals(200, response.code)
@@ -175,6 +184,19 @@ class RESTfulTest(AsyncHTTPTestCase, LogTrapTestCase):
         self.assertEquals('rtl', data['type'])
         self.assertEquals('ready', data['status'])
 
+    def test_device_system_failure(self):
+        def raisefunc(f):
+            raise ValueError(f)
+
+        self._mock_device._delayfunc = raisefunc
+
+        AsyncHTTPClient(self.io_loop).fetch(self.get_url('/device'), self.stop)
+        response = self.wait()
+        self.assertEquals(500, response.code)
+        # get the json reply
+        data = json.loads(response.body)
+        self.assertFalse(data['success'])
+        self.assertEquals('An unknown system error occurred', data['error'])
 
 
 if __name__ == '__main__':
