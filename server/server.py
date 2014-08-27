@@ -11,11 +11,13 @@ import time
 import functools
 
 # third party imports
-import tornado.ioloop
+import tornado
+from tornado import ioloop
 from tornado.httpclient import AsyncHTTPClient
 from tornado import web
 from tornado import gen
 import gevent
+import threading
 
 # application imports
 import rtl_app
@@ -32,23 +34,32 @@ define("debug", default=False, type=bool, help="Enable Tornado debug mode.  Relo
 # establish static directory from this module
 staticdir = os.path.join(os.path.dirname(__import__(__name__).__file__), 'static')
 
-def _background(f):
+def _exec_background(func, *args, **kwargs):
     '''
-        Places a task in the background using gevent.
-        Note that @web.asynchronous must be outside of this
-        decorator
-    '''
-    @functools.wraps(f)
-    def task(self, *args, **kwargs):        
-        logging.info('Entering %s' % f)
+        Executes a function in a Greenlet thread
+        then involes the callback on the ioloop when done.
 
-        def background_task(self, *args, **kwargs):
-            try:
-                f(self, *args, **kwargs)
-            finally:
-                self.finish()
-        gevent.spawn(background_task, self, *args, **kwargs)
-    return task
+        Callback is a required argument
+    '''
+    callback = kwargs.pop('callback')
+
+    # use explicit ioloop for unit testing
+    # Ref: https://github.com/tornadoweb/tornado/issues/663
+    io_loop = kwargs.pop('ioloop', None)
+    if not io_loop:
+        io_loop = ioloop.IOLoop.instance()
+
+
+    def _do_task(*args, **kwargs):
+        rtn, error = None, None
+        try:
+            rtn = func(*args, **kwargs)
+        except Exception, e:
+            error = e
+
+        io_loop.add_callback(callback, rtn, error)
+
+    gevent.spawn(_do_task, *args, **kwargs)
 
 class MainHandler(web.RequestHandler):
 
@@ -64,87 +75,102 @@ class MainHandler(web.RequestHandler):
         self.write("template.html")
 
 class _RTLAppHandler(web.RequestHandler):
-    def initialize(self, rtl_app):
+    def initialize(self, rtl_app, ioloop=None):
         self.rtl_app = rtl_app
+        # explicit ioloop for unit testing
+        self.ioloop = ioloop
 
 class SurveyHandler(_RTLAppHandler):
 
-#    @web.asynchronous
-    def _get_survey(self, callback=None):
-        logging.info("start get survey")
-        rtn = self.rtl_app.get_survey()
-        rtn['availableProcessing'] = self.rtl_app.get_processing_list()
-        logging.info("done get_suvery")
-        callback(rtn)
-        #return rtn
-
- #   @web.asynchronous
-    def _set_survey(self, data, callback=None):
-        logging.info("start set survey")
-        rtn = self.rtl_app.set_survey(frequency=data['frequency'], demod=data['processing'])
-        logging.info("done set_suvery")
-        return rtn
-
- #   @web.asynchronous
-    def _delete_survey(self, callback=None):
-        logging.info("start delete survey")
-        rtn = self.rtl_app.stop_survey()
-        logging.info("done delete_suvery")
-        return rtn
-
 
     @web.asynchronous
-    @_background
     def get(self):
         logging.info("Survey GET")
-        res = yield self._get_survey()
-        self.write(dict(frequency=res['frequency'],
-                        processing=res['demod'],
-                        availableProcessing=res['availableProcessing']))
+        def func():
+            return self.rtl_app.get_survey()
+
+        def cb(rtn, error):
+            self.write(dict(frequency=rtn['frequency'],
+                            processing=res['demod'],
+                            availableProcessing=res['availableProcessing']))
+            self.finish()
+
+        _exec_background(func, callback=cb, ioloop=self.ioloop)
 
     @web.asynchronous
-    @_background
     def post(self):
         logging.debug("Survey POST")
-        data = json.loads(self.request.body)
         try:
-            res = self.rtl_app.set_survey(frequency=data['frequency'], demod=data['processing'])
-            self.write(dict(success=True,
-                            status=dict(frequency=res['frequency'],
-                                        processing=res['demod'])))
-        except rtl_app.BadFrequencyException:
-            self.set_status(400)
+            data = json.loads(self.request.body)
+        except Exception:
+            logging.exception('Unable to parse json: "%s"', self.request.body),
+            self.set_status(500)
             self.write(dict(success=False,
-                            error='Frequency is invalid',
-                            request=data))
-        except rtl_app.BadDemodException:
-            self.set_status(405)
-            self.write(dict(success=False,
-                            error="'%s' is not a valid processor" % data['processing'],
-                            request=data))
+                            error='An unknown system error occurred',
+                            request=self.request.body))
+            self.finish()
+            return
 
-        except Exception:
-            logging.exception("Error setting survey")
-            self.set_status(500)
-            self.write(dict(success=False,
-                            error='An unknown system error occurred',
-                            request=data))
-        
+
+        def task(data):
+            return self.rtl_app.set_survey(frequency=data['frequency'], demod=data['processing'])
+
+
+        def cb2(rtn, error):
+            try:
+                if error:
+                    raise error
+                logging.info("post CALLBACK")
+                self.write(dict(success=True,
+                                status=dict(frequency=rtn['frequency'],
+                                            processing=rtn['demod'])))
+            except rtl_app.BadFrequencyException:
+                self.set_status(400)
+                self.write(dict(success=False,
+                                error='Frequency is invalid',
+                                request=data))
+            except rtl_app.BadDemodException:
+                self.set_status(405)
+                self.write(dict(success=False,
+                                error="'%s' is not a valid processor" % data['processing'],
+                                request=data))
+
+            except Exception:
+                logging.exception("Error setting survey")
+                self.set_status(500)
+                self.write(dict(success=False,
+                                error='An unknown system error occurred',
+                                request=data))
+
+            self.finish()
+            logging.info("post CALLBACK completed")
+
+        _exec_background(task, data, callback=cb2, ioloop=self.ioloop)
+
     @web.asynchronous
-    @_background
     def delete(self):
-        logging.debug("Survey POST")
-        try:
-            res = self.rtl_app.stop_survey()
-            self.write(dict(success=True,
-                            status=dict(frequency=res['frequency'],
-                                        processing=res['demod'])))
-        except Exception:
-            logging.exception("Error stopping survey")
-            self.set_status(500)
-            self.write(dict(success=False,
-                            error='An unknown system error occurred',
-                            request=data))
+        logging.info("Survey DELETE")
+        def task():
+            return self.rtl_app.stop_survey()
+
+        def callback(data, error):
+            try:
+                if error:
+                    raise error
+                
+                self.write(dict(success=True,
+                                status=dict(frequency=data['frequency'],
+                                            processing=data['demod'])))
+            except Exception:
+                logging.exception("Error stopping survey")
+                self.set_status(500)
+                self.write(dict(success=False,
+                                error='An unknown system error occurred'))
+
+            self.finish()
+            logging.info("Survey DELETE End")
+
+        _exec_background(task, callback=callback, ioloop=self.ioloop)
 
 
 class DeviceHandler(_RTLAppHandler): pass
@@ -160,15 +186,15 @@ class StatusHandler(_RTLAppHandler):
         
 class AudioWebSocketHandler(_RTLAppHandler): pass
 
-def get_application(rtl_app):
+def get_application(rtl_app, _ioloop=None):
     application = tornado.web.Application([
     (r"/", MainHandler),
     (r"/static/(.*)", tornado.web.StaticFileHandler, {"path": staticdir}),
 
-    (r"/survey", SurveyHandler, dict(rtl_app=rtl_app)),
-    (r"/device", DeviceHandler, dict(rtl_app=rtl_app)),
-    (r"/output/audio", AudioWebSocketHandler, dict(rtl_app=rtl_app)),
-    (r"/status", StatusHandler, dict(rtl_app=rtl_app))
+    (r"/survey", SurveyHandler, dict(rtl_app=rtl_app, ioloop=_ioloop)),
+    (r"/device", DeviceHandler, dict(rtl_app=rtl_app, ioloop=_ioloop)),
+    (r"/output/audio", AudioWebSocketHandler, dict(rtl_app=rtl_app, ioloop=_ioloop)),
+    (r"/status", StatusHandler, dict(rtl_app=rtl_app, ioloop=_ioloop))
 ], debug=options.debug)
 
     return application
@@ -190,4 +216,4 @@ if __name__ == '__main__':
         raise ValueError('Mock is required')
     application = get_application(rtlapp)
     application.listen(options.port)
-    tornado.ioloop.IOLoop.instance().start()
+    ioloop.IOLoop.instance().start()
