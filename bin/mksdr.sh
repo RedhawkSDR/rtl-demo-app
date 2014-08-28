@@ -1,0 +1,21 @@
+#!/bin/sh -x
+./copysdr.sh /dev/mgr
+./copysdr.sh /dom/mgr
+./copysdr.sh /dev/devices/GPP
+./copysdr.sh /dev/devices/RTL2832U
+./copysdr.sh /dev/devices/sim_RX_DIGITIZER
+./copysdr.sh /dev/nodes/DevMgr_rhdemo1
+./copysdr.sh /dev/nodes/RTL2832_Node
+./copysdr.sh /dev/nodes/sim_RX_DIGITIZER_Node
+./copysdr.sh /dom/components/agc
+./copysdr.sh /dom/components/AmFmPmBasebandDemod
+./copysdr.sh /dom/components/DataConverter
+./copysdr.sh /dom/components/NOOP
+./copysdr.sh /dom/components/RTL_FM_Controller
+./copysdr.sh /dom/components/ScaleOutput
+./copysdr.sh /dom/components/TuneFilterDecimate
+./copysdr.sh /dom/deps/dsp
+./copysdr.sh /dom/deps/fftlib
+./copysdr.sh /dom/domain
+./copysdr.sh /dom/waveforms/Rtl_FM_Waveform
+
