@@ -103,6 +103,13 @@ class MockRTLApp(object):
         return self._device
 
     @_delay
+    def get_processing_list(self):
+        '''
+            Gets all available processing types.
+        '''
+        return self.SURVEY_DEMOD_LIST
+
+    @_delay
     def next_event(self, timeout=0):
         '''
             Thread safe method for returning the next event

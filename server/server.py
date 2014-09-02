@@ -50,6 +50,7 @@ class SurveyHandler(_RTLAppHandler):
     def _get_survey(self, callback=None):
         logging.info("start get survey")
         rtn = self.rtl_app.get_survey()
+        rtn['availableProcessing'] = self.rtl_app.get_processing_list()
         logging.info("done get_suvery")
         return rtn
 
@@ -74,7 +75,8 @@ class SurveyHandler(_RTLAppHandler):
         logging.info("Survey GET")
         res = yield self._get_survey()
         self.write(dict(frequency=res['frequency'],
-                        processing=res['demod']))
+                        processing=res['demod'],
+                        availableProcessing=res['availableProcessing']))
 
     @gen.coroutine
     def post(self):
