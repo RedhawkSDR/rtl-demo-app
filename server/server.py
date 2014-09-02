@@ -21,11 +21,12 @@ import threading
 
 # application imports
 import rtl_app
+from _common import BadDemodException, BadFrequencyException
 
 # setup command line options
 from tornado.options import define, options
 
-define("domain", default="REDHAWK", help="Redhawk domain")
+define("domain", default="REDHAWK_DEV", help="Redhawk domain")
 define("port", default="8888", help="port")
 define("debug", default=False, type=bool, help="Enable Tornado debug mode.  Reloads code")
 
@@ -55,6 +56,7 @@ def _exec_background(func, *args, **kwargs):
         try:
             rtn = func(*args, **kwargs)
         except Exception, e:
+            logging.exception("Callback exception")
             error = e
 
         io_loop.add_callback(callback, rtn, error)
@@ -90,9 +92,17 @@ class SurveyHandler(_RTLAppHandler):
             return self.rtl_app.get_survey()
 
         def cb(rtn, error):
-            self.write(dict(frequency=rtn['frequency'],
-                            processing=res['demod'],
-                            availableProcessing=res['availableProcessing']))
+            try:
+                if error:
+                    raise error
+                self.write(dict(frequency=rtn['frequency'],
+                                processing=rtn['demod'],
+                                availableProcessing=res['availableProcessing']))
+                self.set_status(500)
+                self.write(dict(success=False,
+                                error='An unknown system error occurred',
+                                request=self.request.body))
+
             self.finish()
 
         _exec_background(func, callback=cb, ioloop=self.ioloop)
@@ -113,23 +123,24 @@ class SurveyHandler(_RTLAppHandler):
 
 
         def task(data):
-            return self.rtl_app.set_survey(frequency=data['frequency'], demod=data['processing'])
+            return self.rtl_app.set_survey(frequency=data['frequency'], demod=data['processing'], timeout=5)
 
 
         def cb2(rtn, error):
             try:
                 if error:
+                    print type(error)
                     raise error
                 logging.info("post CALLBACK")
                 self.write(dict(success=True,
                                 status=dict(frequency=rtn['frequency'],
                                             processing=rtn['demod'])))
-            except rtl_app.BadFrequencyException:
+            except BadFrequencyException:
                 self.set_status(400)
                 self.write(dict(success=False,
                                 error='Frequency is invalid',
                                 request=data))
-            except rtl_app.BadDemodException:
+            except BadDemodException:
                 self.set_status(405)
                 self.write(dict(success=False,
                                 error="'%s' is not a valid processor" % data['processing'],
@@ -171,7 +182,6 @@ class SurveyHandler(_RTLAppHandler):
             logging.info("Survey DELETE End")
 
         _exec_background(task, callback=callback, ioloop=self.ioloop)
-
 
 class DeviceHandler(_RTLAppHandler):
     @web.asynchronous
@@ -232,7 +242,8 @@ if __name__ == '__main__':
     define("delay", default=0, type=int, help="Mock delay in milliseconds")
     tornado.options.parse_command_line()
     if options.mock:
-        rtlapp = rtl_app.MockRTLApp(options.domain, 
+        from mock_rtl_app import MockRTLApp
+        rtlapp = MockRTLApp(options.domain, 
                                     delayfunc=lambda f: time.sleep(options.delay))
     else:
         rtlapp = rtl_app.RTLApp(options.domain, 

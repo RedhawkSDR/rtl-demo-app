@@ -10,18 +10,7 @@ from ossie.utils import redhawk
 from ossie.utils.redhawk.channels import ODMListener
 from ossie.cf import StandardEvent, ExtendedEvent, CF
 
-
-class BadDemodException(Exception):
-
-    def __init__(self, demod):
-        Exception.__init__(self, "Bad demodulator '%s'" % demod)
-        self.demod = demod
-
-class BadFrequencyException(Exception):
-
-    def __init__(self, frequency):
-        Exception.__init__(self, "Bad frequency %s" % frequency)
-        self.frequency = frequency
+from _common import BadDemodException, BadFrequencyException
 
 def _delay(func):
 
@@ -69,7 +58,7 @@ class RTLApp(object):
             return dict(frequency=None, demod=None)
 
     @_delay
-    def set_survey(self, frequency, demod):
+    def set_survey(self, frequency, demod, timeout=2):
         '''
              Sets the survey properties.  Returns the new processing values.
 
@@ -87,7 +76,7 @@ class RTLApp(object):
             comp = self._get_manager()
         except IndexError:
             self._launch_waveform()
-            comp = self._get_manager(timeout=2)
+            comp = self._get_manager(timeout=timeout)
 
         comp.Frequency = (frequency / 1000000.0)
         survey = dict(frequency=int(1000000 * round(comp.Frequency, 4)), demod='fm')
@@ -182,8 +171,9 @@ class RTLApp(object):
         '''
         if not self._domain:
             self._domain =  redhawk.attach(self._domainname)
-            self._odmListener = ODMListener()
-            self._odmListener.connect(self._domain)
+            self._odmListener = None
+            # self._odmListener = ODMListener()
+            # self._odmListener.connect(self._domain)
         return self._domain
 
     def _get_manager(self, timeout=0):
@@ -193,8 +183,11 @@ class RTLApp(object):
                 try:
                     self._manager = locate_component(self._get_domain(), 'RTL_FM_Controller_1')
                 except IndexError:
-                    if (time.time() - t) > timeout:
+                    delta = time.time() - t
+                    if delta > timeout:
+                        print delta
                         raise
+                    time.sleep(.1)
 
         return self._manager
         
@@ -221,9 +214,12 @@ class RTLApp(object):
 
 
 def locate_component(domain, ident):
+    logging.info("\n\nXXXXXX\nLooking for %s" % (ident,))
     idprefix = "%s:" % ident
     for app in domain.apps:
+        logging.info("\n\nXXXXXX\nLooking for %s in %s" % (ident, app._get_name()))
         for comp in app.comps:
+            logging.info("\n\nXXXXXX\nDoes %s match %s\n\nXXXXXX\n" % (ident, comp._id))
             if comp._id.startswith(idprefix):
                 return comp
     raise IndexError('No such identifier %s' % ident)

@@ -14,6 +14,7 @@ from tornado.httpclient import AsyncHTTPClient, HTTPRequest
 # application imports
 import server
 import rtl_app
+import mock_rtl_app
 
 # all method returning suite is required by tornado.testing.main()
 def all():
@@ -28,9 +29,15 @@ def all():
 
 class RESTfulTest(AsyncHTTPTestCase, LogTrapTestCase):
 
+    # def setUp(self):
+    #     super(RESTfulTest, self).setUp()
+    #     rtl_app.RTLApp('REDHAWK_DEV').stop_survey()
+
+
     def get_app(self):
         # renewed each test case
-        self._mock_device = rtl_app.MockRTLApp('REDHAWK_DEV')
+        # self._mock_device = mock_rtl_app.MockRTLApp('REDHAWK_DEV')
+        self._mock_device = rtl_app.RTLApp('REDHAWK_DEV')
         return server.get_application(self._mock_device, _ioloop=self.io_loop)
 
     # def stop(self, *args, **kwargs):
@@ -109,6 +116,7 @@ class RESTfulTest(AsyncHTTPTestCase, LogTrapTestCase):
                         self.stop)
         response = self.wait()
 
+        # print response, response.body
         self.assertEquals(400, response.code)
         data = json.loads(response.buffer.getvalue())
         self.assertFalse(data['success'])
@@ -188,6 +196,7 @@ class RESTfulTest(AsyncHTTPTestCase, LogTrapTestCase):
         def raisefunc(f):
             raise ValueError(f)
 
+        # this causes the application to fail
         self._mock_device._delayfunc = raisefunc
 
         AsyncHTTPClient(self.io_loop).fetch(self.get_url('/device'), self.stop)
