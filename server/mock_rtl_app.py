@@ -3,13 +3,7 @@
 import collections
 import threading
 import time
-import logging
-import pprint
 from functools import wraps
-from ossie.utils import redhawk
-from ossie.utils.redhawk.channels import ODMListener
-from ossie.cf import StandardEvent, ExtendedEvent, CF
-
 
 class BadDemodException(Exception):
 
@@ -31,20 +25,16 @@ def _delay(func):
         return func(self, *args, **kwargs)
     return do_delay
 
-class RTLApp(object):
+class MockRTLApp(object):
     SURVEY_DEMOD_LIST = [ "fm" ]
 
     FREQUENCY_RANGE = [1000000, 900000000]
 
-    RTL_FM_WAVEFORM_ID = 'DCE:1ed946d9-3e77-4acc-8c2c-912641da6545'
-
     def __init__(self, domainname, delayfunc=lambda meth: None):
         '''
-              delayfunc - a function  delay function is invoked during a call.
+              The delay function is invoked during a call.
         '''
         self._domainname = domainname
-        self._domain = None
-        self._manager = None
 
         self._event_condition = threading.Condition()
         self._event_queue = collections.deque()
@@ -63,10 +53,8 @@ class RTLApp(object):
                 demod: "fm"
             }
         '''
-        try:
-            return dict(frequency=int(1000000 * round(self._get_manager().Frequency, 4)), demod='fm')
-        except IndexError:
-            return dict(frequency=None, demod=None)
+        # FIXME: Connect with FrontEnd device and processing mode
+        return self._survey
 
     @_delay
     def set_survey(self, frequency, demod):
@@ -83,23 +71,15 @@ class RTLApp(object):
         if frequency < self.FREQUENCY_RANGE[0] or frequency > self.FREQUENCY_RANGE[1]:
             raise BadFrequencyException(frequency)
 
-        try:
-            comp = self._get_manager()
-        except IndexError:
-            self._launch_waveform()
-            comp = self._get_manager(timeout=2)
-
-        comp.Frequency = (frequency / 1000000.0)
-        survey = dict(frequency=int(1000000 * round(comp.Frequency, 4)), demod='fm')
-        self._post_event('survey', survey)
-        return survey
+        self._survey = dict(frequency=int(frequency), demod=demod)
+        self._post_event('survey', self._survey)
+        return self._survey
 
     @_delay
     def stop_survey(self):
-        self._stop_waveform()
-        survey = dict(frequency=None, demod=None)
-        self._post_event('survey', survey)
-        return survey
+        self._survey = dict(frequency=None, demod=None)
+        self._post_event('survey', self._survey)
+        return self._survey
 
 
     @_delay
@@ -121,13 +101,6 @@ class RTLApp(object):
 
         '''
         return self._device
-
-    @_delay
-    def get_processing_list(self):
-        '''
-            Gets all available processing types.
-        '''
-        return self.SURVEY_DEMOD_LIST
 
     @_delay
     def next_event(self, timeout=0):
@@ -174,56 +147,3 @@ class RTLApp(object):
     def _set_device(self, dtype, status):
         self._device = dict(type=dtype, status=status)
         self._post_event('device', self._device)
-
-    def _get_domain(self):
-        '''
-            Returns the current connection to the domain,
-            creating a connection if it's unavailable
-        '''
-        if not self._domain:
-            self._domain =  redhawk.attach(self._domainname)
-            self._odmListener = ODMListener()
-            self._odmListener.connect(self._domain)
-        return self._domain
-
-    def _get_manager(self, timeout=0):
-        if not self._manager:
-            t = time.time()
-            while not self._manager:
-                try:
-                    self._manager = locate_component(self._get_domain(), 'RTL_FM_Controller_1')
-                except IndexError:
-                    if (time.time() - t) > timeout:
-                        raise
-
-        return self._manager
-        
-
-    def _launch_waveform(self):
-        try:
-            print self._get_domain().installApplication('/waveforms/Rtl_FM_Waveform/Rtl_FM_Waveform.sad.xml')
-        except CF.DomainManager.ApplicationAlreadyInstalled:
-            logging.info("Waveform Rtl_FM_Waveform already installed", exc_info=1)
-
-        for appFact in self._get_domain()._get_applicationFactories():
-            if appFact._get_identifier() == self.RTL_FM_WAVEFORM_ID:
-                print appFact.create('wave2', [], [])
-                break
-
-    def _stop_waveform(self):
-        for a in self._get_domain().apps:
-            if a._get_name() == 'wave2':
-                a.releaseObject()
-                return
-        logging.info("Waveform 'wave2' not halted - not found")
-
-
-
-
-def locate_component(domain, ident):
-    idprefix = "%s:" % ident
-    for app in domain.apps:
-        for comp in app.comps:
-            if comp._id.startswith(idprefix):
-                return comp
-    raise IndexError('No such identifier %s' % ident)

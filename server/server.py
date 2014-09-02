@@ -235,7 +235,8 @@ if __name__ == '__main__':
         rtlapp = rtl_app.MockRTLApp(options.domain, 
                                     delayfunc=lambda f: time.sleep(options.delay))
     else:
-        raise ValueError('Mock is required')
+        rtlapp = rtl_app.RTLApp(options.domain, 
+                                    delayfunc=lambda f: time.sleep(options.delay))
     application = get_application(rtlapp)
     application.listen(options.port)
     ioloop.IOLoop.instance().start()
