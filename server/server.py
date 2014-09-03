@@ -240,6 +240,7 @@ if __name__ == '__main__':
     # parse the command line
     define("mock", default=False, type=bool, help="Run with the mock application back end")
     define("delay", default=0, type=int, help="Mock delay in milliseconds")
+    define("rtlstat", default=None, type=str, help="Program that returns RTL device status using a successful exit code. 0=ready, 1=not ready")
     tornado.options.parse_command_line()
     if options.mock:
         from mock_rtl_app import MockRTLApp
@@ -247,7 +248,8 @@ if __name__ == '__main__':
                                     delayfunc=lambda f: time.sleep(options.delay))
     else:
         rtlapp = rtl_app.RTLApp(options.domain, 
-                                    delayfunc=lambda f: time.sleep(options.delay))
+                                    delayfunc=lambda f: time.sleep(options.delay),
+                                    rtlstatprog=options.rtlstat)
     application = get_application(rtlapp)
     application.listen(options.port)
     ioloop.IOLoop.instance().start()

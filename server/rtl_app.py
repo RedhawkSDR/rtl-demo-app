@@ -5,6 +5,8 @@ import threading
 import time
 import logging
 import pprint
+import os
+from subprocess import Popen
 from functools import wraps
 from ossie.utils import redhawk
 from ossie.utils.redhawk.channels import ODMListener
@@ -27,7 +29,7 @@ class RTLApp(object):
 
     RTL_FM_WAVEFORM_ID = 'DCE:1ed946d9-3e77-4acc-8c2c-912641da6545'
 
-    def __init__(self, domainname, delayfunc=lambda meth: None):
+    def __init__(self, domainname, delayfunc=lambda meth: None, rtlstatprog=None):
         '''
               delayfunc - a function  delay function is invoked during a call.
         '''
@@ -40,7 +42,10 @@ class RTLApp(object):
         self._survey = dict(frequency=None, demod=None)
         self._device = dict(type='rtl', status='unavailable')
         self._delayfunc = delayfunc
-
+        if not rtlstatprog:
+            bindir = "%s/../bin" % os.path.dirname(__import__(__name__).__file__)
+            rtlstatprog = os.path.join(os.path.abspath(bindir), 'rtlstat.sh')
+        self._rtlstat = rtlstatprog
 
     @_delay
     def get_survey(self):
@@ -109,7 +114,16 @@ class RTLApp(object):
             }
 
         '''
-        return self._device
+        # FIXME: Make in future
+        try:
+            p = Popen(self._rtlstat, shell=False)
+            p.wait()
+        except Exception, e:
+            raise StandardError("%s: Failed to get device status %s" %  (self._rtlstat, str(e)))
+        if p.returncode:
+            return dict(type='rtl', status='unavailable')
+        else:
+            return dict(type='rtl', status='ready')
 
     @_delay
     def get_processing_list(self):
@@ -160,10 +174,6 @@ class RTLApp(object):
         finally:
             self._event_condition.release()
 
-    def _set_device(self, dtype, status):
-        self._device = dict(type=dtype, status=status)
-        self._post_event('device', self._device)
-
     def _get_domain(self):
         '''
             Returns the current connection to the domain,
@@ -181,7 +191,7 @@ class RTLApp(object):
             t = time.time()
             while not self._manager:
                 try:
-                    self._manager = locate_component(self._get_domain(), 'RTL_FM_Controller_1')
+                    self._manager = _locate_component(self._get_domain(), 'RTL_FM_Controller_1')
                 except IndexError:
                     delta = time.time() - t
                     if delta > timeout:
@@ -200,7 +210,9 @@ class RTLApp(object):
 
         for appFact in self._get_domain()._get_applicationFactories():
             if appFact._get_identifier() == self.RTL_FM_WAVEFORM_ID:
-                print appFact.create('wave2', [], [])
+                x = appFact.create('wave2', [], [])
+                print "GOT X %s" % x
+                x.start()
                 break
 
     def _stop_waveform(self):
@@ -213,7 +225,7 @@ class RTLApp(object):
 
 
 
-def locate_component(domain, ident):
+def _locate_component(domain, ident):
     logging.info("\n\nXXXXXX\nLooking for %s" % (ident,))
     idprefix = "%s:" % ident
     for app in domain.apps:
