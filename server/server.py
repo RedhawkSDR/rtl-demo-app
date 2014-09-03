@@ -98,6 +98,7 @@ class SurveyHandler(_RTLAppHandler):
                 self.write(dict(frequency=rtn['frequency'],
                                 processing=rtn['demod'],
                                 availableProcessing=res['availableProcessing']))
+            except Exception:
                 self.set_status(500)
                 self.write(dict(success=False,
                                 error='An unknown system error occurred',
