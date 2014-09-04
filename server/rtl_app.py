@@ -62,6 +62,9 @@ class RTLApp(object):
         except IndexError:
             return dict(frequency=None, demod=None)
 
+    def get_available_processing(self):
+        return self.SURVEY_DEMOD_LIST
+
     @_delay
     def set_survey(self, frequency, demod, timeout=2):
         '''

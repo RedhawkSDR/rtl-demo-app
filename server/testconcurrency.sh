@@ -23,6 +23,7 @@ runtests() {
 }
 
 runtests "http://localhost:8888/survey" '{ "frequency": 123131123, "processing": "fm" }'
+runtests "http://localhost:8888/survey"
 
 curl -w " $i\n" -X DELETE http://localhost:8888/survey &
 curl -w " $i\n" -X DELETE http://localhost:8888/survey &

@@ -26,7 +26,6 @@ def all():
 #         AsyncHTTPClient(self.io_loop).fetch("http://www.tornadoweb.org/", self.stop)
 #         response = self.wait()
 
-
 class RESTfulTest(AsyncHTTPTestCase, LogTrapTestCase):
 
     # def setUp(self):
@@ -52,8 +51,9 @@ class RESTfulTest(AsyncHTTPTestCase, LogTrapTestCase):
         self.assertEquals(200, response.code)
         # get the json reply
         data = json.loads(response.buffer.getvalue())
-        self.assertEquals(None, data['frequency'])
-        self.assertEquals(None, data['processing'])
+        self.assertEquals(None, data['status']['frequency'])
+        self.assertEquals(None, data['status']['processing'])
+        self.assertEquals(['fm'], data['availableProcessing'])
 
     def test_survey_post(self, pdata=dict(frequency=88500000, processing='fm')):
         # verify survey initial values
@@ -77,7 +77,7 @@ class RESTfulTest(AsyncHTTPTestCase, LogTrapTestCase):
         response = self.wait()
         self.assertEquals(200, response.code)
         data = json.loads(response.buffer.getvalue())
-        self.assertEquals(pdata, data)
+        self.assertEquals(pdata, data['status'])
 
     def test_survey_delete(self):
 
@@ -104,8 +104,8 @@ class RESTfulTest(AsyncHTTPTestCase, LogTrapTestCase):
         response = self.wait()
         self.assertEquals(200, response.code)
         data = json.loads(response.buffer.getvalue())
-        self.assertEquals(None, data['frequency'])
-        self.assertEquals(None, data['processing'])
+        self.assertEquals(None, data['status']['frequency'])
+        self.assertEquals(None, data['status']['processing'])
 
     def test_survey_post_bounds_errors(self):
         request = dict(frequency=10, processing='fm')
@@ -210,5 +210,8 @@ class RESTfulTest(AsyncHTTPTestCase, LogTrapTestCase):
 
 if __name__ == '__main__':
 
+    # FIXME: Make command line arugment to replace rtl_app with mock
+    #rtl_app = mock_rtl_app
    # logging.basicConfig(level=logging.debug)
     tornado.testing.main()
+

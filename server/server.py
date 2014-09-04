@@ -89,16 +89,17 @@ class SurveyHandler(_RTLAppHandler):
     def get(self):
         logging.info("Survey GET")
         def func():
-            return self.rtl_app.get_survey()
+            return self.rtl_app.get_survey(), self.rtl_app.get_available_processing()
 
         def cb(rtn, error):
             try:
                 if error:
                     raise error
-                self.write(dict(frequency=rtn['frequency'],
-                                processing=rtn['demod'],
-                                availableProcessing=res['availableProcessing']))
+                self.write(dict(status=dict(frequency=rtn[0]['frequency'],
+                                            processing=rtn[0]['demod']),
+                                availableProcessing=rtn[1]))
             except Exception:
+                logging.exception("Error getting survey")
                 self.set_status(500)
                 self.write(dict(success=False,
                                 error='An unknown system error occurred',
@@ -244,8 +245,8 @@ if __name__ == '__main__':
     define("rtlstat", default=None, type=str, help="Program that returns RTL device status using a successful exit code. 0=ready, 1=not ready")
     tornado.options.parse_command_line()
     if options.mock:
-        from mock_rtl_app import MockRTLApp
-        rtlapp = MockRTLApp(options.domain, 
+        from mock_rtl_app import RTLApp
+        rtlapp = RTLApp(options.domain, 
                                     delayfunc=lambda f: time.sleep(options.delay))
     else:
         rtlapp = rtl_app.RTLApp(options.domain, 

@@ -15,7 +15,7 @@ def _delay(func):
         return func(self, *args, **kwargs)
     return do_delay
 
-class MockRTLApp(object):
+class RTLApp(object):
     SURVEY_DEMOD_LIST = [ "fm" ]
 
     FREQUENCY_RANGE = [1000000, 900000000]
@@ -46,8 +46,11 @@ class MockRTLApp(object):
         # FIXME: Connect with FrontEnd device and processing mode
         return self._survey
 
+    def get_available_processing(self):
+        return self.SURVEY_DEMOD_LIST
+
     @_delay
-    def set_survey(self, frequency, demod):
+    def set_survey(self, frequency, demod, timeout=5):
         '''
              Sets the survey properties.  Returns the new processing values.
 
