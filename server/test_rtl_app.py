@@ -3,6 +3,7 @@ import unittest
 import sys
 import rtl_app
 import time
+from tornado import gen
 
 class RTLAppTest(unittest.TestCase):
 
@@ -49,20 +50,25 @@ class RTLAppTest(unittest.TestCase):
 		self.assertEquals(None, a['demod'])
 		self.assertEquals(None, a['frequency'])
 
-		e = rtl.next_event(timeout=1)
-		a = e['body']
-		self.assertEquals(e['type'], 'survey')
-		self.assertEquals('fm', a['demod'])
-		self.assertEquals(101100000, a['frequency'])
-		e = rtl.next_event(timeout=1)
-		a = e['body']
-		self.assertEquals(e['type'], 'survey')
-		self.assertEquals(None, a['demod'])
-		self.assertEquals(None, a['frequency'])
-		e = rtl.next_event(timeout=.5)
-		self.assertEquals(None, e)
-		e = rtl.next_event()
-		self.assertEquals(None, e)
+		def checkit(e):
+			a = e['body']
+			self.assertEquals(e['type'], 'survey')
+			self.assertEquals('fm', a['demod'])
+			self.assertEquals(101100000, a['frequency'])
+		rtl.next_event(callback=checkit)
+
+		def checkit(e):
+			print "CHECKING"
+			a = e['body']
+			self.assertEquals(e['type'], 'survey')
+			self.assertEquals(None, a['demod'])
+			self.assertEquals(None, a['frequency'])
+		rtl.next_event(callback=checkit)
+
+		def checkit(e):
+			self.assertEquals(None, e)
+		rtl.next_event(callback=checkit)
+		rtl.next_event(callback=checkit)
 
 	def test_survey_delay(self):
 		#self.test_survey(rtl_app.MockRTLApp("domain", lambda f: sys.stdout.write("Func %s\n" % f)))
