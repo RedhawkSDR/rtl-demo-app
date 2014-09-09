@@ -5,18 +5,22 @@ import unittest
 import json
 import logging
 import time
+import threading
+from functools import partial
 
 # tornado imports
 import tornado
 import tornado.testing
 from tornado.testing import AsyncHTTPTestCase, LogTrapTestCase
 from tornado.httpclient import AsyncHTTPClient, HTTPRequest
+from tornado import websocket
 
 # application imports
 import server
 import rtl_app
 import rtl_app_wrapper
 import mock_rtl_app
+import wsclient
 
 # all method returning suite is required by tornado.testing.main()
 def all():
@@ -40,10 +44,10 @@ class RESTfulTest(AsyncHTTPTestCase, LogTrapTestCase):
         concurrent_rtl_class = rtl_app_wrapper.mk_concurrent_rtl(mock_rtl_app.RTLApp)
 
         # application renewed each test case
-        self._mock_device = concurrent_rtl_class('REDHAWK_DEV', delayfunc=lambda f: time.sleep(1))
+        self._mock_device = concurrent_rtl_class('REDHAWK_DEV', delayfunc=lambda f: time.sleep(.1))
 
         #self._mock_device = rtl_app.RTLApp('REDHAWK_DEV')
-        return server.get_application(self._mock_device, 
+        return server.get_application(self._mock_device,
                                       _ioloop=self.io_loop)
 
     # def stop(self, *args, **kwargs):
@@ -214,6 +218,56 @@ class RESTfulTest(AsyncHTTPTestCase, LogTrapTestCase):
         self.assertFalse(data['success'])
         self.assertEquals('An unknown system error occurred', data['error'])
 
+
+    # def test_status_websocket(self):
+
+    #     class EventThread(threading.Thread):
+
+    #         def run(self):
+    #             for x in xrange(5):
+    #                 stat = x % 2 and 'ready' or 'unavailable'
+    #                 self._mock_device._set_device('rtl', stat)
+    #                 time.sleep(.2)
+
+
+
+    #     class WSClient(wsclient.WebSocket):
+    #         def on_message(self, data):
+    #             _self.assertEquals(data, 'hello')
+    #             _self.io_loop.add_callback(_self.stop)
+
+    #     ethread = EventThread()
+
+    #     self.io_loop.add_callback(partial(WSClient, self.get_url('/status'),
+    #                                       self.io_loop))
+    #     self.io_loop.add_callback(ethread.start)
+    #     self.wait()
+
+    @tornado.testing.gen_test
+    def test_status_ws(self):
+
+        _mock_device = self._mock_device
+
+        class EventThread(threading.Thread):
+
+            def run(self):
+                for x in xrange(5):
+                    stat = x % 2 and 'ready' or 'unavailable'
+                    _mock_device._set_device('rtl', stat)
+                    time.sleep(.2)
+        ethread = EventThread()
+        self.io_loop.add_callback(ethread.start)
+  
+        url = self.get_url('/status')
+        url = url.replace('http', 'ws')
+
+        conn1 = yield websocket.websocket_connect(url,
+                                                  io_loop=self.io_loop) 
+        for x in xrange(5):
+            message = yield conn1.read_message()
+            print "Message #%s: %s" % (x, message)
+        conn1.protocol.close()
+ 
 
 if __name__ == '__main__':
 

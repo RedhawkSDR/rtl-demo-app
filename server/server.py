@@ -169,7 +169,7 @@ class EventHandler(websocket.WebSocketHandler):
     def _next_event(self, event_future):
         # if connection still open, get the next event
         if self.ws_connection:
-            self.ioloop.addFuture(self.rtl_app.next_event(), self._next_event)
+            self.ioloop.add_future(self.rtl_app.next_event(), self._next_event)
 
         # if we got a future, write it
         if event_future:
@@ -183,7 +183,8 @@ def get_application(rtl_app, _ioloop=None):
     (r"/survey", SurveyHandler, dict(rtl_app=rtl_app, ioloop=_ioloop)),
     (r"/device", DeviceHandler, dict(rtl_app=rtl_app, ioloop=_ioloop)),
 #    (r"/output/audio", AudioWebSocketHandler, dict(rtl_app=rtl_app, ioloop=_ioloop)),
-    (r"/status", StatusHandler, dict(rtl_app=rtl_app, ioloop=_ioloop))
+    # (r"/status", StatusHandler, dict(rtl_app=rtl_app, ioloop=_ioloop))
+    (r"/status", EventHandler, dict(rtl_app=rtl_app, ioloop=_ioloop))
 ], debug=options.debug)
 
     return application

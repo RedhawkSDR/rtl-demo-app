@@ -4,6 +4,7 @@ import collections
 import threading
 import time
 from functools import wraps
+import logging
 
 from _common import BadDemodException, BadFrequencyException
 
@@ -27,7 +28,11 @@ class RTLApp(object):
         self._domainname = domainname
 
         self._event_condition = threading.Condition()
+        # backlog of events
         self._event_queue = collections.deque()
+        # backlog of callbacks for pending events
+        self._event_callback_queue = collections.deque()
+
         self._survey = dict(frequency=None, demod=None)
         self._device = dict(type='rtl', status='unavailable')
         self._delayfunc = delayfunc
@@ -96,10 +101,13 @@ class RTLApp(object):
         return self._device
 
     @_delay
-    def next_event(self, timeout=0):
+    def next_event(self, callback=None):
         '''
-            Thread safe method for returning the next event
-            available.  Returns the next event or a None if no event is available
+            Asynchronous method to return the next event.  Callback is called when thread
+            is available.
+
+            NOTE: Callback method MUST be thread safe.  It may be called from another thread.
+
 
             Possible events:
                  {
@@ -113,29 +121,27 @@ class RTLApp(object):
                      'body': { ... }
                  }
         '''
-        self._event_condition.acquire()
-        try:
-            if not self._event_queue and timeout > 0:
-                self._event_condition.wait(timeout)
-
-            try:
-                return self._event_queue.popleft()
-            except IndexError:
-                return None
-        finally:
-            self._event_condition.release()
+        with self._event_condition:
+            if self._event_queue:
+                callback(self._event_queue.popleft())
+            else:
+                self._event_callback_queue.append(callback)
 
     def _post_event(self, etype, body):
         ''' 
             Internal method to post a new event
         '''
+        with self._event_condition:
+            e = dict(type=etype, body=body)
+            if self._event_callback_queue:
+                try:
+                    self._event_callback_queue.popleft()(e)
+                except Exception, e:
+                    logging.exception('Error firing event %s', e)
+            else:
+                self._event_queue.append(e)
 
-        self._event_condition.acquire()
-        try:
-            self._event_queue.append(dict(type=etype, body=body))
-            self._event_condition.notify()
-        finally:
-            self._event_condition.release()
+
 
     def _set_device(self, dtype, status):
         self._device = dict(type=dtype, status=status)

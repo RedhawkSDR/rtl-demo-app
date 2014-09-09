@@ -14,7 +14,7 @@ def _return_future_ioloop(func):
         thread safety.  Executes the callback in 
         the ioloop thread
     '''
-    @functools.partial
+    @functools.wraps(func)
     def _exec_func(*args, **kwargs):
 
         future = concurrent.TracebackFuture()
