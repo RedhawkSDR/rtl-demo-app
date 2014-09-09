@@ -4,6 +4,7 @@
 import unittest
 import json
 import logging
+import time
 
 # tornado imports
 import tornado
@@ -14,6 +15,7 @@ from tornado.httpclient import AsyncHTTPClient, HTTPRequest
 # application imports
 import server
 import rtl_app
+import rtl_app_wrapper
 import mock_rtl_app
 
 # all method returning suite is required by tornado.testing.main()
@@ -34,10 +36,15 @@ class RESTfulTest(AsyncHTTPTestCase, LogTrapTestCase):
 
 
     def get_app(self):
-        # renewed each test case
-        # self._mock_device = mock_rtl_app.MockRTLApp('REDHAWK_DEV')
-        self._mock_device = rtl_app.RTLApp('REDHAWK_DEV')
-        return server.get_application(self._mock_device, _ioloop=self.io_loop)
+        # create a concurrent version of the applicaiton
+        concurrent_rtl_class = rtl_app_wrapper.mk_concurrent_rtl(mock_rtl_app.RTLApp)
+
+        # application renewed each test case
+        self._mock_device = concurrent_rtl_class('REDHAWK_DEV', delayfunc=lambda f: time.sleep(1))
+
+        #self._mock_device = rtl_app.RTLApp('REDHAWK_DEV')
+        return server.get_application(self._mock_device, 
+                                      _ioloop=self.io_loop)
 
     # def stop(self, *args, **kwargs):
     #     print "STOPPING %s %s" % (args, kwargs)
