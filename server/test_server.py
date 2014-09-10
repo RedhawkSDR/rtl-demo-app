@@ -214,55 +214,56 @@ class RESTfulTest(AsyncHTTPTestCase, LogTrapTestCase):
         self.assertEquals('An unknown system error occurred', data['error'])
 
 
-    # def test_status_websocket(self):
-
-    #     class EventThread(threading.Thread):
-
-    #         def run(self):
-    #             for x in xrange(5):
-    #                 stat = x % 2 and 'ready' or 'unavailable'
-    #                 self._mock_device._set_device('rtl', stat)
-    #                 time.sleep(.2)
-
-
-
-    #     class WSClient(wsclient.WebSocket):
-    #         def on_message(self, data):
-    #             _self.assertEquals(data, 'hello')
-    #             _self.io_loop.add_callback(_self.stop)
-
-    #     ethread = EventThread()
-
-    #     self.io_loop.add_callback(partial(WSClient, self.get_url('/status'),
-    #                                       self.io_loop))
-    #     self.io_loop.add_callback(ethread.start)
-    #     self.wait()
-
     @tornado.testing.gen_test
     def test_status_ws(self):
 
         _mock_device = self._mock_device
-
         class EventThread(threading.Thread):
-
             def run(self):
                 for x in xrange(5):
                     stat = x % 2 and 'ready' or 'unavailable'
                     _mock_device._set_device('rtl', stat)
                     time.sleep(.2)
-        ethread = EventThread()
-        self.io_loop.add_callback(ethread.start)
   
-        url = self.get_url('/status')
-        url = url.replace('http', 'ws')
-
+        url = self.get_url('/status').replace('http', 'ws')
         conn1 = yield websocket.websocket_connect(url,
                                                   io_loop=self.io_loop) 
+        self.io_loop.add_callback(EventThread().start)
         for x in xrange(5):
             message = yield conn1.read_message()
             print "Message #%s: %s" % (x, message)
         conn1.protocol.close()
  
+    @tornado.testing.gen_test
+    def test_status_dual_ws(self):
+
+        _mock_device = self._mock_device
+        class EventThread(threading.Thread):
+            def run(self):
+                for x in xrange(5):
+                    stat = x % 2 and 'ready' or 'unavailable'
+                    _mock_device._set_device('rtl', stat)
+                    time.sleep(.2)
+  
+        url = self.get_url('/status').replace('http', 'ws')
+        conn1 = yield websocket.websocket_connect(url,
+                                                  io_loop=self.io_loop) 
+        conn2 = yield websocket.websocket_connect(url,
+                                                  io_loop=self.io_loop) 
+        self.io_loop.add_callback(EventThread().start)
+        for x in xrange(5):
+            stat = x % 2 and 'ready' or 'unavailable'
+            message = yield conn1.read_message()
+            logging.debug("Connection 1 message #%s: %s", x, message)
+            data = json.loads(message)
+            self.assertEquals(stat, data['body']['status'])
+            
+            message = yield conn2.read_message()
+            logging.debug("Connection 2 message #%s: %s", x, message)
+            data = json.loads(message)
+            self.assertEquals(stat, data['body']['status'])
+        conn1.close()
+        conn2.close()
 
 if __name__ == '__main__':
 

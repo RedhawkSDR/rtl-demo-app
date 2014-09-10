@@ -3,6 +3,7 @@ import unittest
 import sys
 import rtl_app
 import time
+import collections
 from tornado import gen
 
 class RTLAppTest(unittest.TestCase):
@@ -21,10 +22,16 @@ class RTLAppTest(unittest.TestCase):
 		self.assertEquals(None, a['demod'])
 
 
-	def test_survey(self, rtl=None):
+	def test_survey(self, rtl=None):		
 		if not rtl:
 			#rtl = rtl_app.MockRTLApp("domain")
 			rtl = rtl_app.RTLApp("REDHAWK_DEV")
+
+		events = collections.deque()
+		def elisten(event):
+			events.append(event)
+		rtl.add_event_listener(elisten)
+
 		a = rtl.get_survey()
 		self.assertEquals(None, a['frequency'])
 		self.assertEquals(None, a['demod'])
@@ -50,25 +57,19 @@ class RTLAppTest(unittest.TestCase):
 		self.assertEquals(None, a['demod'])
 		self.assertEquals(None, a['frequency'])
 
-		def checkit(e):
-			a = e['body']
-			self.assertEquals(e['type'], 'survey')
-			self.assertEquals('fm', a['demod'])
-			self.assertEquals(101100000, a['frequency'])
-		rtl.next_event(callback=checkit)
+		e = events.popleft()
+		a = e['body']
+		self.assertEquals(e['type'], 'survey')
+		self.assertEquals('fm', a['demod'])
+		self.assertEquals(101100000, a['frequency'])
 
-		def checkit(e):
-			print "CHECKING"
-			a = e['body']
-			self.assertEquals(e['type'], 'survey')
-			self.assertEquals(None, a['demod'])
-			self.assertEquals(None, a['frequency'])
-		rtl.next_event(callback=checkit)
+		e = events.popleft()
+		a = e['body']
+		self.assertEquals(e['type'], 'survey')
+		self.assertEquals(None, a['demod'])
+		self.assertEquals(None, a['frequency'])
 
-		def checkit(e):
-			self.assertEquals(None, e)
-		rtl.next_event(callback=checkit)
-		rtl.next_event(callback=checkit)
+		self.assertEquals(0, len(events))
 
 	def test_survey_delay(self):
 		#self.test_survey(rtl_app.MockRTLApp("domain", lambda f: sys.stdout.write("Func %s\n" % f)))

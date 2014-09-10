@@ -155,24 +155,19 @@ class EventHandler(websocket.WebSocketHandler):
     def open(self):
         logging.debug('Event handler open')
         # register event handling
-        self._next_event(None)
+        self.rtl_app.add_event_listener(self._post_event)
 
     def on_message(self, message):
         logging.debug('stream message[%d]: %s', len(message), message)
 
     def on_close(self):
         logging.debug('Stream CLOSE')
-        self.thread.stop()
-        self.thread = None
+        self.rtl_app.rm_event_listener(self._post_event)
 
-    def _next_event(self, event_future):
-        # if connection still open, get the next event
-        if self.ws_connection:
-            self.ioloop.add_future(self.rtl_app.next_event(), self._next_event)
-
-        # if we got a future, write it
-        if event_future:
-            self.write_message(event_future.result())
+    def _post_event(self, event):
+        # if connection still open, post the next event
+        #if self.ws_connection:
+        self.ioloop.add_callback(self.write_message, event)
     
 
 def get_application(rtl_app, _ioloop=None):

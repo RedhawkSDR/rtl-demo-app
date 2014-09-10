@@ -37,11 +37,8 @@ class RTLApp(object):
         self._domain = None
         self._manager = None
 
-        self._event_condition = threading.Condition()
-        # backlog of events
-        self._event_queue = collections.deque()
-        # backlog of callbacks for pending events
-        self._event_callback_queue = collections.deque()
+        # event listeners
+        self._listeners = []
 
         self._survey = dict(frequency=None, demod=None)
         self._device = dict(type='rtl', status='unavailable')
@@ -139,46 +136,30 @@ class RTLApp(object):
         '''
         return self.SURVEY_DEMOD_LIST
 
-    @_delay
-    def next_event(self, callback=None):
+    def add_event_listener(self, listener):
         '''
-            Asynchronous method to return the next event.  Callback is called when thread
-            is available.
-
-            NOTE: Callback method MUST be thread safe.  It may be called from another thread.
-
-
-            Possible events:
-                 {
-                     'type': 'survey-change'
-                     'body': { ... }
-                 }
-
-
-                 {
-                     'type': 'device-change'
-                     'body': { ... }
-                 }
+            Adds a listener for events
         '''
-        with self._event_condition:
-            if self._event_queue:
-                callback(self._event_queue.popleft())
-            else:
-                self._event_callback_queue.append(callback)
+        self._listeners.append(listener)
+
+    def rm_event_listener(self, listener):
+        '''
+            Removes a listener for events
+        '''
+        # FIXME: Is this thread safe
+        self._listeners.remove(listener)
 
     def _post_event(self, etype, body):
         ''' 
             Internal method to post a new event
         '''
-        with self._event_condition:
-            e = dict(type=etype, body=body)
-            if self._event_callback_queue:
-                try:
-                    self._event_callback_queue.popleft()(e)
-                except Exception, e:
-                    logging.exception('Error firing event %s', e)
-            else:
-                self._event_queue.append(e)
+        e = dict(type=etype, body=body)
+        for l in self._listeners:
+            try:
+                l(e)
+            except Exception, e:
+                logging.exception('Error firing event %s to %s', e, l)
+
 
     def _get_domain(self):
         '''
@@ -251,4 +232,3 @@ class AsyncRTLApp(RTLApp):
     set_survey = background_task(RTLApp.set_survey)
     stop_survey = background_task(RTLApp.stop_survey)
     get_device = background_task(RTLApp.get_device)
-    next_event = safe_return_future(RTLApp.next_event)
