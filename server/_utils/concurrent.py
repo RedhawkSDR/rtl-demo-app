@@ -1,5 +1,5 @@
 # do this as early as possible in your application
-from gevent import monkey; monkey.patch_all()
+#from gevent import monkey; monkey.patch_all()
 
 import functools
 from tornado import gen, concurrent
@@ -8,16 +8,23 @@ import gevent
 import logging
 import sys
 
-def _return_future_ioloop(func):
+_LINE='%'*40
+
+def safe_return_future(func):
     '''
         Identical to tornado.gen.return_future plus
         thread safety.  Executes the callback in 
         the ioloop thread
     '''
     @functools.wraps(func)
-    def _exec_func(*args, **kwargs):
+    def exec_func(*args, **kwargs):
 
         future = concurrent.TracebackFuture()
+
+        # accept optional callback
+        callback = kwargs.pop('callback', None)
+        if callback:
+            future.add_done_callback(callback)
 
         try:
          
@@ -38,14 +45,18 @@ def _return_future_ioloop(func):
 
         return future
 
-    return _exec_func
+    exec_func.__doc__ = \
+         ("%s\nsafe_return_future() wrapped function.\n" + \
+          "Runs asynchronously and returns a Future.\n" + \
+         "See _utils.concurrent for more info\n%s\n%s") % (_LINE, _LINE, exec_func.__doc__)
+    return exec_func
 
 
 
-def _wrap_background_func(func):
+def background_task(func):
 
     @functools.wraps(func)
-    def _exec_background(*args, **kwargs):
+    def exec_background(*args, **kwargs):
         '''
             Executes a function in a background Greenlet thread
             and returns a Future invoked when the thread completes.
@@ -58,14 +69,19 @@ def _wrap_background_func(func):
             that do not use the singleton ioloop.  If set to none,
             IOLoop.current() is returned
         '''
+        # traceback future maintains python stack in exception
+        future = concurrent.TracebackFuture()
+
         # use explicit ioloop for unit testing
         # Ref: https://github.com/tornadoweb/tornado/issues/663
         io_loop = kwargs.pop('ioloop', None)
         if not io_loop:
             io_loop = ioloop.IOLoop.current()
 
-        # traceback future maintains python stack in exception
-        future = concurrent.TracebackFuture()
+        # accept optional callback
+        callback = kwargs.pop('callback', None)
+        if callback:
+            future.add_done_callback(callback)
 
         def _do_task(*args, **kwargs):
             try:
@@ -78,18 +94,8 @@ def _wrap_background_func(func):
 
         gevent.spawn(_do_task, *args, **kwargs)
         return future
-    return _exec_background
-
-def mk_concurrent_rtl(baseclass):
-    '''
-        Builds an RTLApp that uses futures for background processes and the
-        next_event
-    '''
-    class RTLApp(baseclass):
-        get_survey = _wrap_background_func(baseclass.get_survey)
-        set_survey = _wrap_background_func(baseclass.set_survey)
-        stop_survey = _wrap_background_func(baseclass.stop_survey)
-        get_device = _wrap_background_func(baseclass.get_device)
-        #get_available_processing = _wrap_background_func(baseclass.get_available_processing)
-        next_event = _return_future_ioloop(baseclass.next_event)
-    return RTLApp
+    exec_background.__doc__ = \
+     ("%s\nbackground_task() wrapped function.\n" + \
+     "Runs asynchronously and returns a Future.\n" + \
+     "See _utils.concurrent for more info\n%s\n%s") % (_LINE, _LINE, exec_background.__doc__)
+    return exec_background

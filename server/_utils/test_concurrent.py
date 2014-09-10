@@ -3,11 +3,15 @@ from gevent import monkey; monkey.patch_all()
 
 import unittest
 import sys
+import logging
 import time
+
+import gevent
 from tornado import gen
 from tornado.testing import AsyncTestCase, LogTrapTestCase, main, gen_test
-import rtl_app_wrapper
-import gevent
+
+
+import concurrent
 
 # all method returning suite is required by tornado.testing.main()
 def all():
@@ -16,13 +20,13 @@ def all():
 
 class FuturesTest(AsyncTestCase):
 
-	@rtl_app_wrapper._wrap_background_func
+	@concurrent.background_task
 	def _sleepfunc(self, input, duration=1, exception=False):
-		print "RAN TEST!!!"
+		logging.debug("_sleepfun start")
 		time.sleep(duration)
 		if exception:
 			raise input
-		print "TEST DONE"
+		logging.debug("_sleepfun end")
 		return input
 
 
@@ -33,50 +37,56 @@ class FuturesTest(AsyncTestCase):
 		    done or raised an exception.
 		'''
 		f = yield self._sleepfunc("the input is 1", 1)
-		print "The future is %s" %f
-		# self.io_loop.add_future(f, self.stop)
-		# print "RESULT IS '%s'" % self.wait()
+		logging.debug("The future is %s", f)
 		self.assertEquals("the input is 1", f)
+
+	@gen_test
+	def test_background_future_except1(self):
+		''' 
+		    Runs a thread that sleeps in the background and generates a Future to indicate it's
+		    done or raised an exception.
+		'''
+		try:
+			f = yield self._sleepfunc(ValueError('ignore me'), 1, exception=True)
+			self.fail("Expecting ValueError")
+		except ValueError:
+			logging.info("Manual inspection of stack trace required:", exc_info=1)
 
 	def test_background_future_exception(self):
 		''' 
 		    Runs a thread that sleeps in the background and generates a Future to indicate it's
 		    done or raised an exception.
 		'''
-		f = self._sleepfunc(IndexError('whatever'), 1, exception=True)
-		print "The future is %s" %f
+		f = self._sleepfunc(ValueError('ignore me'), 1, exception=True)
+		logging.debug("The future is %s", f)
 		self.io_loop.add_future(f, self.stop)
 		gevent.sleep(0)
 		f2 = self.wait()
 		# print "RESULT IS '%s'" % self.wait()
-		self.assertEquals(IndexError, type(f2.exception()))
+		self.assertEquals(ValueError, type(f2.exception()))
 
-	@rtl_app_wrapper._wrap_background_func
-	def _callbackfunc(self, input, duration=1, callback=None):
-		print "input=%s, callback=%s" % (input, callback)
-		def background(i):
-			print "_callbackfunc!!!"
-			time.sleep(duration)
-			callback(i)
-		gevent.spawn(background, input)
 
 	@gen_test
 	def test_callback_future(self):
-		_cbfunc = rtl_app_wrapper._return_future_ioloop(self._callbackfunc)
-		# import pdb
-		# pdb.set_trace()
-		f = yield _cbfunc("the input is 1", 1)
-		print "The future is %s" %f
-		# self.io_loop.add_future(f, self.stop)
-		# print "RESULT IS '%s'" % self.wait()
+
+		@concurrent.safe_return_future
+		def cbfunc(input, duration=1, callback=None):
+			logging.debug("input=%s, callback=%s", input, callback)
+			def background(i):
+				logging.debug("invoking cbfunc")
+				time.sleep(duration)
+				callback(i)
+			gevent.spawn(background, input)
+
+		f = yield cbfunc("the input is 1", 1)
+		logging.debug("The future is %s", f)
 		self.assertEquals("the input is 1", f)
 
 
+	#TODO: Add tests for callback options
 
 
 if __name__ == '__main__':
 
-    # FIXME: Make command line arugment to replace rtl_app with mock
-    #rtl_app = mock_rtl_app
-   # logging.basicConfig(level=logging.debug)
+	# to enable logging, use --logging=debug
     main()

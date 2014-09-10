@@ -9,10 +9,10 @@ import os
 from subprocess import Popen
 from functools import wraps
 from ossie.utils import redhawk
-from ossie.utils.redhawk.channels import ODMListener
 from ossie.cf import StandardEvent, ExtendedEvent, CF
 
 from _common import BadDemodException, BadFrequencyException
+from _utils.concurrent import background_task, safe_return_future
 
 def _delay(func):
 
@@ -241,3 +241,14 @@ def _locate_component(domain, ident):
             if comp._id.startswith(idprefix):
                 return comp
     raise IndexError('No such identifier %s' % ident)
+
+
+class AsyncRTLApp(RTLApp):
+    '''
+        An asynchronous version of the RTLApp that returns Futures and accepts callbacks.
+    '''
+    get_survey = background_task(RTLApp.get_survey)
+    set_survey = background_task(RTLApp.set_survey)
+    stop_survey = background_task(RTLApp.stop_survey)
+    get_device = background_task(RTLApp.get_device)
+    next_event = safe_return_future(RTLApp.next_event)

@@ -18,7 +18,6 @@ from tornado import websocket
 # application imports
 import server
 import rtl_app
-import rtl_app_wrapper
 import mock_rtl_app
 import wsclient
 
@@ -41,7 +40,8 @@ class RESTfulTest(AsyncHTTPTestCase, LogTrapTestCase):
 
     def get_app(self):
         # create a concurrent version of the applicaiton
-        concurrent_rtl_class = rtl_app_wrapper.mk_concurrent_rtl(mock_rtl_app.RTLApp)
+        concurrent_rtl_class = mock_rtl_app.AsyncRTLApp
+        #concurrent_rtl_class = rtl_app.AsyncRTLApp
 
         # application renewed each test case
         self._mock_device = concurrent_rtl_class('REDHAWK_DEV', delayfunc=lambda f: time.sleep(.1))
@@ -50,11 +50,6 @@ class RESTfulTest(AsyncHTTPTestCase, LogTrapTestCase):
         return server.get_application(self._mock_device,
                                       _ioloop=self.io_loop)
 
-    # def stop(self, *args, **kwargs):
-    #     print "STOPPING %s %s" % (args, kwargs)
-    #     return super(RESTfulTest, self).stop(*args, **kwargs)
-    # def get_new_ioloop(self):
-        # return tornado.ioloop.IOLoop.instance()
 
     def test_survey_get(self):
         AsyncHTTPClient(self.io_loop).fetch(self.get_url('/survey'), self.stop)

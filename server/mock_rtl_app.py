@@ -7,6 +7,7 @@ from functools import wraps
 import logging
 
 from _common import BadDemodException, BadFrequencyException
+from _utils.concurrent import background_task, safe_return_future
 
 def _delay(func):
 
@@ -146,3 +147,13 @@ class RTLApp(object):
     def _set_device(self, dtype, status):
         self._device = dict(type=dtype, status=status)
         self._post_event('device', self._device)
+
+class AsyncRTLApp(RTLApp):
+    '''
+        An asynchronous version of the Mock RTLApp that returns Futures and accepts callbacks.
+    '''
+    get_survey = background_task(RTLApp.get_survey)
+    set_survey = background_task(RTLApp.set_survey)
+    stop_survey = background_task(RTLApp.stop_survey)
+    get_device = background_task(RTLApp.get_device)
+    next_event = safe_return_future(RTLApp.next_event)

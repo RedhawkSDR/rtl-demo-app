@@ -5,13 +5,18 @@ thisdir=`cd "$thisdir" && pwd`
 export LD_LIBRARY_PATH=/usr/local/lib:/usr/local/redhawk/core/lib64
 export PATH=$PATH:/usr/local/redhawk/core/bin
 export SDRROOT="$thisdir"/sdr
+export RHDOMAIN=REDHAWK_DEV
 
 DIGITIZER_NODE=/nodes/RTL2832_Node/DeviceManager.dcd.xml
+startmsg='with RTL frontend node'
+QUOTES=\'\"
+DQUOTE=\"
 
 usage() {
     cat <<EOFEOF
 Usage: $0 [-sh]
  
+   -d DOMAIN
    -h Show help
    -s Run with the RTL simulator
 EOFEOF
@@ -22,10 +27,11 @@ err() {
     exit 1
 }
 
-while getopts "hs" opt ; do
-    echo "This is opt $opt"
+while getopts "hsd:" opt ; do
     case "$opt" in 
-        s) DIGITIZER_NODE=/nodes/sim_RX_DIGITIZER_Node/DeviceManager.dcd.xml ;;
+        s) DIGITIZER_NODE=/nodes/sim_RX_DIGITIZER_Node/DeviceManager.dcd.xml
+           startmsg='with RTL simulator node' ;;
+        d) RHDOMAIN="$OPTARG" ;;
         h) usage; exit 0 ;;
         *) err "BAD PARAMETER $opt" ;;
     esac
@@ -38,20 +44,24 @@ trap 'kill -1 $pids' 0
 
 mkdir -p logs || err
 
+sed -i "/refid=.DomainName/ s/value=[$QUOTES][^$QUOTES]*[$QUOTES]/value=$DQUOTE$RHDOMAIN$DQUOTE/" "$SDRROOT/dom/waveforms/Rtl_FM_Waveform/Rtl_FM_Waveform.sad.xml" || err
+
 #NBARGS=--force-rebind --nopersist
 NBARGS=
 
 # Domain Manager
-nodeBooter $NBARGS -D /domain/DomainManager.dmd.xml > logs/domain.log 2>&1 || err &
+nodeBooter $NBARGS -D /domain/DomainManager.dmd.xml --domainname $RHDOMAIN > logs/domain.log 2>&1 || err &
 pids=$!
 
 # GPP
-nodeBooter $NBARGS -d /nodes/DevMgr_rhdemo1/DeviceManager.dcd.xml > logs/gpp.log 2>&1 || err &
+nodeBooter $NBARGS -d /nodes/DevMgr_rhdemo1/DeviceManager.dcd.xml --domainname $RHDOMAIN > logs/gpp.log 2>&1 || err &
 pids="$pids $!"
 
 # Digitizer
-nodeBooter $NBARGS -d "$DIGITIZER_NODE" > logs/digitizer.log  2>&1 || err &
+nodeBooter $NBARGS -d "$DIGITIZER_NODE" --domainname $RHDOMAIN > logs/digitizer.log  2>&1 || err &
 pids="$pids $!"
+
+echo "Started $RHDOMAIN domain $startmsg. Use Ctrl-C to halt"
 
 #FIXME: sleeps are horrible. Better to wait for device manager initializatio to complete
 # before launching

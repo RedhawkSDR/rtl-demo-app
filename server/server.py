@@ -21,8 +21,7 @@ import gevent
 import threading
 
 # application imports
-import rtl_app
-import rtl_app_wrapper
+from rtl_app import AsyncRTLApp
 from _common import BadDemodException, BadFrequencyException
 
 # setup command line options
@@ -201,13 +200,13 @@ if __name__ == '__main__':
     define("rtlstat", default=None, type=str, help="Program that returns RTL device status using a successful exit code. 0=ready, 1=not ready")
     tornado.options.parse_command_line()
     if options.mock:
-        from mock_rtl_app import RTLApp
-        rtlapp = RTLApp(options.domain, 
+        from mock_rtl_app import AsyncRTLApp
+        rtlapp = AsyncRTLApp(options.domain, 
                                     delayfunc=lambda f: time.sleep(options.delay))
     else:
-        rtlapp = rtl_app.RTLApp(options.domain, 
-                                    delayfunc=lambda f: time.sleep(options.delay),
-                                    rtlstatprog=options.rtlstat)
+        rtlapp = AsyncRTLApp(options.domain, 
+                        delayfunc=lambda f: time.sleep(options.delay),
+                        rtlstatprog=options.rtlstat)
     application = get_application(rtlapp)
     application.listen(options.port)
     ioloop.IOLoop.instance().start()
