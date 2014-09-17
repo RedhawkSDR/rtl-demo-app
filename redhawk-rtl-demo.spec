@@ -43,6 +43,7 @@ Requires:       redhawk >= 1.10
 Requires:       redhawk-devel
 Requires:       redhawk-web
 BuildRequires:  npm
+BuildRequires:  git
 
 %description
 %{summary}
