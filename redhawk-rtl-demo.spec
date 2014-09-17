@@ -24,6 +24,10 @@
 %define _supervisor /etc/redhawk-web/supervisor.d
 %define _nginx /etc/nginx/conf.d/redhawk-sites
 
+%define bower node_modules/bower/bin/bower
+%define grunt node_modules/grunt-cli/bin/grunt
+
+
 Prefix:         %{_prefix}
 Name:		redhawk-rtl-demo
 Version:	0.1
@@ -38,6 +42,7 @@ Requires:       python
 Requires:       redhawk >= 1.10
 Requires:       redhawk-devel
 Requires:       redhawk-web
+BuildRequires:  npm
 
 %description
 %{summary}
@@ -51,7 +56,9 @@ Requires:       redhawk-web
 
 %install
 cd rtl-demo-client
-grunt dist
+npm install
+%{bower} install
+%{grunt} dist
 cd -
 
 mkdir -p $RPM_BUILD_ROOT%{_rtl_demo}
