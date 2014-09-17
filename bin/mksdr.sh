@@ -8,6 +8,7 @@
 ./copysdr.sh /dev/nodes/RTL2832_Node
 ./copysdr.sh /dev/nodes/sim_RX_DIGITIZER_Node
 ./copysdr.sh /dom/components/agc
+./copysdr.sh /dom/components/psd
 ./copysdr.sh /dom/components/AmFmPmBasebandDemod
 ./copysdr.sh /dom/components/DataConverter
 ./copysdr.sh /dom/components/NOOP

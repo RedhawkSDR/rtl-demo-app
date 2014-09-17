@@ -257,13 +257,16 @@ class RESTfulTest(AsyncHTTPTestCase, LogTrapTestCase):
             logging.debug("Connection 1 message #%s: %s", x, message)
             data = json.loads(message)
             self.assertEquals(stat, data['body']['status'])
-            
+
             message = yield conn2.read_message()
             logging.debug("Connection 2 message #%s: %s", x, message)
             data = json.loads(message)
             self.assertEquals(stat, data['body']['status'])
         conn1.close()
         conn2.close()
+        # FIXME: Ensure that close is being called on websocket so that is tested
+        # tried with stop(), but unsure if that does anything
+        self.stop()
 
 if __name__ == '__main__':
 
