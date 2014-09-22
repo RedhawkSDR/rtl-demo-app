@@ -9,6 +9,7 @@ import os,sys
 import logging
 import time
 import functools
+import numpy
 
 # third party imports
 import tornado
@@ -21,7 +22,7 @@ import gevent
 import threading
 
 # application imports
-from rtl_app import AsyncRTLApp, PORT_TYPE_NARROWBAND, PORT_TYPE_WIDEBAND
+from rtl_app import AsyncRTLApp
 from _common import BadDemodException, BadFrequencyException
 
 # setup command line options
@@ -34,6 +35,14 @@ define("debug", default=False, type=bool, help="Enable Tornado debug mode.  Relo
 
 # establish static directory from this module
 staticdir = os.path.join(os.path.dirname(__import__(__name__).__file__), 'static')
+
+
+def _floats2bin(flist):
+    """
+        Converts a list of python floating point values
+        to a packed array of IEEE 754 32 bit floating point
+    """
+    return numpy.array(flist).astype('float32').tostring()
 
 
 class _RTLAppHandler(web.RequestHandler):
@@ -180,7 +189,7 @@ class PSDHandler(websocket.WebSocketHandler):
         if not ioloop:
             ioloop = ioloop.IOLoop.instance()
 
-        self.ioloop = ioloop
+        self._ioloop = ioloop
 
     def open(self, ):
         logging.debug('PSD handler for %s open', self.port_type)
@@ -215,7 +224,7 @@ class PSDHandler(websocket.WebSocketHandler):
     def _pushPacket(self, data, ts, EOS, stream_id):
 
         # FIXME: need to write ts, EOS and stream id
-        self._ioloop.add_callback(self.write_message, self.converter(data), binary=True)
+        self._ioloop.add_callback(self.write_message, _floats2bin(data), binary=True)
 
     def write_message(self, *args, **ioargs):
         # hide WebSocketClosedError because it's very likely
@@ -234,9 +243,9 @@ def get_application(rtl_app, _ioloop=None):
     # (r"/status", StatusHandler, dict(rtl_app=rtl_app, ioloop=_ioloop))
     (r"/status", EventHandler, dict(rtl_app=rtl_app, ioloop=_ioloop)),
     (r"/output/psd/narrowband", PSDHandler,
-     dict(rtl_app=rtl_app, port_type=PORT_TYPE_NARROWBAND, ioloop=_ioloop)),
-    (r"/output/psd/widebandband", PSDHandler,
-     dict(rtl_app=rtl_app, port_type=PORT_TYPE_WIDEBAND, ioloop=_ioloop))
+     dict(rtl_app=rtl_app, port_type=rtl_app.PORT_TYPE_NARROWBAND, ioloop=_ioloop)),
+    (r"/output/psd/wideband", PSDHandler,
+     dict(rtl_app=rtl_app, port_type=rtl_app.PORT_TYPE_WIDEBAND, ioloop=_ioloop))
 ], debug=options.debug)
 
     return application

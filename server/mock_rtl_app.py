@@ -19,8 +19,10 @@ def _delay(func):
 
 class RTLApp(object):
     SURVEY_DEMOD_LIST = [ "fm" ]
-
     FREQUENCY_RANGE = [1000000, 900000000]
+    PORT_TYPE_WIDEBAND = 'wideband%s'
+    PORT_TYPE_NARROWBAND = 'narrowband%s'
+
 
     def __init__(self, domainname, delayfunc=lambda meth: None):
         '''
@@ -29,7 +31,13 @@ class RTLApp(object):
         self._domainname = domainname
 
         # event listeners
-        self._listeners = []
+        self._listeners = {
+           'event': [],
+           self.PORT_TYPE_WIDEBAND%'data': [],
+           self.PORT_TYPE_WIDEBAND%'sri': [],
+           self.PORT_TYPE_NARROWBAND%'data': [],
+           self.PORT_TYPE_NARROWBAND%'sri': []
+        }
 
         self._survey = dict(frequency=None, demod=None)
         self._device = dict(type='rtl', status='unavailable')
@@ -102,26 +110,62 @@ class RTLApp(object):
         '''
             Adds a listener for events
         '''
-        self._listeners.append(listener)
+        self._listeners['event'].append(listener)
 
     def rm_event_listener(self, listener):
         '''
             Removes a listener for events
         '''
         # FIXME: Is this thread safe
-        self._listeners.remove(listener)
+        self._listeners['event'].remove(listener)
+
+
+    def add_stream_listener(self, portname, data_listener, sri_listener=None):
+        '''
+             Adds a listener for streaming (SRI and Data).
+
+             e.g.
+             >>> add_stream_listener(PORTTYPE_WIDEBAND, my_data_listener, my_sri_listener)
+        '''
+        self._listeners[portname%'data'].append(data_listener)
+        if sri_listener:
+            self._listeners[portname%'sri'].append(sri_listener)
+
+    def rm_stream_listener(self, portname, data_listener, sri_listener=None):
+        '''
+             Adds a listener for streaming (SRI and Data).
+
+             e.g.
+             >>> add_stream_listener(PORTTYPE_WIDEBAND, my_data_listener, my_sri_listener)
+        '''
+        self._listeners[portname%'data'].remove(data_listener)
+        if sri_listener:
+            self._listeners[portname%'sri'].remove(sri_listener)
 
     def _post_event(self, etype, body):
         ''' 
             Internal method to post a new event
         '''
         e = dict(type=etype, body=body)
-        for l in self._listeners:
+        for l in self._listeners['event']:
             try:
                 l(e)
             except Exception, e:
                 logging.exception('Error firing event %s to %s', e, l)
 
+    def _post_packet(self, portname, data, ts, EOS, stream_id):
+        for l in self._listeners[portname % 'data']:
+            try:
+                l(data, ts, EOS, stream_id)
+            except Exception, e:
+                logging.exception('Error firing packet %s to %s', (data, ts, EOS, stream_id), l)
+
+    def _post_SRI(self, portname, SRI):
+        for l in self._listeners[portname % 'sri']:
+            try:
+                l(SRI)
+            except Exception, e:
+                logging.exception('Error firing SRI %s to %s', SRI, l)
 
     def _set_device(self, dtype, status):
         self._device = dict(type=dtype, status=status)

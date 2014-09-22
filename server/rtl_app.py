@@ -24,16 +24,14 @@ def _delay(func):
         return func(self, *args, **kwargs)
     return do_delay
 
-PORT_TYPE_WIDEBAND = 'wideband%s'
-PORT_TYPE_NARROWBAND = 'narrowband%s'
 
 
 class RTLApp(object):
     SURVEY_DEMOD_LIST = [ "fm" ]
     FREQUENCY_RANGE = [1000000, 900000000]
     RTL_FM_WAVEFORM_ID = 'DCE:1ed946d9-3e77-4acc-8c2c-912641da6545'
-    PORT_TYPE_WIDEBAND = PORT_TYPE_WIDEBAND
-    PORT_TYPE_NARROWBAND = PORT_TYPE_NARROWBAND
+    PORT_TYPE_WIDEBAND = 'wideband%s'
+    PORT_TYPE_NARROWBAND = 'narrowband%s'
 
     def __init__(self, domainname, delayfunc=lambda meth: None, rtlstatprog=None):
         '''
@@ -46,10 +44,10 @@ class RTLApp(object):
         # event listeners
         self._listeners = {
            'event': [],
-           PORT_TYPE_WIDEBAND%'data': [],
-           PORT_TYPE_WIDEBAND%'sri': [],
-           PORT_TYPE_NARROWBAND%'data': [],
-           PORT_TYPE_NARROWBAND%'sri': []
+           RTLApp.PORT_TYPE_WIDEBAND%'data': [],
+           RTLApp.PORT_TYPE_WIDEBAND%'sri': [],
+           RTLApp.PORT_TYPE_NARROWBAND%'data': [],
+           RTLApp.PORT_TYPE_NARROWBAND%'sri': []
         }
         
         self._survey = dict(frequency=None, demod=None)
@@ -192,7 +190,7 @@ class RTLApp(object):
         for l in self._listeners['event']:
             try:
                 l(e)
-            except Exception, e:
+            except Exception:
                 logging.exception('Error firing event %s to %s', e, l)
 
 
@@ -228,10 +226,10 @@ class RTLApp(object):
         
 
     def  _init_psd_listeners(self):
-        self._push_sri_psd1 = self._generate_bulkio_callback(PORT_TYPE_WIDEBAND, 'sri')
-        self._push_packet_psd1 = self._generate_bulkio_callback(PORT_TYPE_WIDEBAND, 'data')
-        self._push_sri_psd2 = self._generate_bulkio_callback(PORT_TYPE_NARROWBAND, 'sri')
-        self._push_packet_psd2 = self._generate_bulkio_callback(PORT_TYPE_NARROWBAND, 'data')
+        self._push_sri_psd1 = self._generate_bulkio_callback(self.PORT_TYPE_WIDEBAND, 'sri')
+        self._push_packet_psd1 = self._generate_bulkio_callback(self.PORT_TYPE_WIDEBAND, 'data')
+        self._push_sri_psd2 = self._generate_bulkio_callback(self.PORT_TYPE_NARROWBAND, 'sri')
+        self._push_packet_psd2 = self._generate_bulkio_callback(self.PORT_TYPE_NARROWBAND, 'data')
 
         port = self._get_component('psd_1').getPort('fft_dataFloat_out')
         self._psd1_port = AsyncPort(AsyncPort.PORT_TYPE_FLOAT, self._push_sri_psd1, self._push_packet_psd1)
@@ -254,7 +252,7 @@ class RTLApp(object):
                 try:
                     l(*args)
                 except Exception, e:
-                    logging.exception('Error firing event %s to %s', e, l)
+                    logging.exception('Error firing event %s to %s', args, l)
         return bulkio_callback_func
 
 
