@@ -152,14 +152,14 @@ class StatusHandler(_RTLAppHandler):
 
 class EventHandler(websocket.WebSocketHandler):
 
-    def initialize(self, rtl_app, ioloop=None):
+    def initialize(self, rtl_app, _ioloop=None):
         self.rtl_app = rtl_app
 
         # explicit ioloop for unit testing
-        if not ioloop:
-            ioloop = ioloop.IOLoop.instance()
+        if not _ioloop:
+            _ioloop = ioloop.IOLoop.instance()
 
-        self.ioloop = ioloop
+        self.ioloop = _ioloop
 
     def open(self):
         logging.debug('Event handler open')
@@ -181,15 +181,15 @@ class EventHandler(websocket.WebSocketHandler):
 
 class PSDHandler(websocket.WebSocketHandler):
 
-    def initialize(self, rtl_app, port_type, ioloop=None):
+    def initialize(self, rtl_app, port_type, _ioloop=None):
         self.rtl_app = rtl_app
         self.port_type = port_type
 
         # explicit ioloop for unit testing
-        if not ioloop:
-            ioloop = ioloop.IOLoop.instance()
+        if not _ioloop:
+            _ioloop = ioloop.IOLoop.instance()
 
-        self._ioloop = ioloop
+        self._ioloop = _ioloop
 
     def open(self, ):
         logging.debug('PSD handler for %s open', self.port_type)
@@ -243,9 +243,9 @@ def get_application(rtl_app, _ioloop=None):
     # (r"/status", StatusHandler, dict(rtl_app=rtl_app, ioloop=_ioloop))
     (r"/status", EventHandler, dict(rtl_app=rtl_app, ioloop=_ioloop)),
     (r"/output/psd/narrowband", PSDHandler,
-     dict(rtl_app=rtl_app, port_type=rtl_app.PORT_TYPE_NARROWBAND, ioloop=_ioloop)),
+     dict(rtl_app=rtl_app, port_type=rtl_app.PORT_TYPE_NARROWBAND, _ioloop=_ioloop)),
     (r"/output/psd/wideband", PSDHandler,
-     dict(rtl_app=rtl_app, port_type=rtl_app.PORT_TYPE_WIDEBAND, ioloop=_ioloop))
+     dict(rtl_app=rtl_app, port_type=rtl_app.PORT_TYPE_WIDEBAND, _ioloop=_ioloop))
 ], debug=options.debug)
 
     return application
