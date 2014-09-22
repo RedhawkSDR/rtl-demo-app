@@ -21,7 +21,7 @@ import gevent
 import threading
 
 # application imports
-from rtl_app import AsyncRTLApp
+from rtl_app import AsyncRTLApp, PORT_TYPE_NARROWBAND, PORT_TYPE_WIDEBAND
 from _common import BadDemodException, BadFrequencyException
 
 # setup command line options
@@ -170,6 +170,60 @@ class EventHandler(websocket.WebSocketHandler):
         self.ioloop.add_callback(self.write_message, event)
     
 
+class PSDHandler(websocket.WebSocketHandler):
+
+    def initialize(self, rtl_app, port_type, ioloop=None):
+        self.rtl_app = rtl_app
+        self.port_type = port_type
+
+        # explicit ioloop for unit testing
+        if not ioloop:
+            ioloop = ioloop.IOLoop.instance()
+
+        self.ioloop = ioloop
+
+    def open(self, ):
+        logging.debug('PSD handler for %s open', self.port_type)
+        # register event handling
+        self.rtl_app.add_stream_listener(self.port_type, self._pushPacket, self._pushSRI)
+
+    def on_message(self, message):
+        logging.debug('stream message[%d]: %s', len(message), message)
+
+    def on_close(self):
+        logging.debug('PSD handler stream CLOSE')
+        try:
+            self.rtl_app.rm_stream_listener(self.port_type, self._pushPacket, self._pushSRI)
+        except Exception, e:
+            logging.exception('Error disconnecting port %s' % self.port_type)
+
+    def _pushSRI(self, SRI):
+        self._ioloop.add_callback(self.write_message, 
+            dict(hversion=SRI.hversion,
+                xstart=SRI.xstart,
+                xdelta=SRI.xdelta,
+                xunits=SRI.xunits,
+                subsize=SRI.subsize,
+                ystart=SRI.ystart,
+                ydelta=SRI.ydelta,
+                yunits=SRI.yunits,
+                mode=SRI.mode,
+                streamID=SRI.streamID,
+                blocking=SRI.blocking,
+                keywords=dict(((kw.id, kw.value.value()) for kw in SRI.keywords))))
+
+    def _pushPacket(self, data, ts, EOS, stream_id):
+
+        # FIXME: need to write ts, EOS and stream id
+        self._ioloop.add_callback(self.write_message, self.converter(data), binary=True)
+
+    def write_message(self, *args, **ioargs):
+        # hide WebSocketClosedError because it's very likely
+        try:
+            super(PSDHandler, self).write_message(*args, **ioargs)
+        except websocket.WebSocketClosedError:
+            logging.debug('Received WebSocketClosedError. Ignoring')
+
 def get_application(rtl_app, _ioloop=None):
     application = tornado.web.Application([
     (r"/static/(.*)", tornado.web.StaticFileHandler, {"path": staticdir}),
@@ -178,7 +232,11 @@ def get_application(rtl_app, _ioloop=None):
     (r"/device", DeviceHandler, dict(rtl_app=rtl_app, ioloop=_ioloop)),
 #    (r"/output/audio", AudioWebSocketHandler, dict(rtl_app=rtl_app, ioloop=_ioloop)),
     # (r"/status", StatusHandler, dict(rtl_app=rtl_app, ioloop=_ioloop))
-    (r"/status", EventHandler, dict(rtl_app=rtl_app, ioloop=_ioloop))
+    (r"/status", EventHandler, dict(rtl_app=rtl_app, ioloop=_ioloop)),
+    (r"/output/psd/narrowband", PSDHandler,
+     dict(rtl_app=rtl_app, port_type=PORT_TYPE_NARROWBAND, ioloop=_ioloop)),
+    (r"/output/psd/widebandband", PSDHandler,
+     dict(rtl_app=rtl_app, port_type=PORT_TYPE_WIDEBAND, ioloop=_ioloop))
 ], debug=options.debug)
 
     return application

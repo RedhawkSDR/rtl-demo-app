@@ -11,6 +11,8 @@ from functools import wraps
 from ossie.utils import redhawk
 from ossie.cf import StandardEvent, ExtendedEvent, CF
 
+from rest.asyncport import AsyncPort
+
 from _common import BadDemodException, BadFrequencyException
 from _utils.concurrent import background_task, safe_return_future
 
@@ -22,12 +24,16 @@ def _delay(func):
         return func(self, *args, **kwargs)
     return do_delay
 
+PORT_TYPE_WIDEBAND = 'wideband%s'
+PORT_TYPE_NARROWBAND = 'narrowband%s'
+
+
 class RTLApp(object):
     SURVEY_DEMOD_LIST = [ "fm" ]
-
     FREQUENCY_RANGE = [1000000, 900000000]
-
     RTL_FM_WAVEFORM_ID = 'DCE:1ed946d9-3e77-4acc-8c2c-912641da6545'
+    PORT_TYPE_WIDEBAND = PORT_TYPE_WIDEBAND
+    PORT_TYPE_NARROWBAND = PORT_TYPE_NARROWBAND
 
     def __init__(self, domainname, delayfunc=lambda meth: None, rtlstatprog=None):
         '''
@@ -35,11 +41,17 @@ class RTLApp(object):
         '''
         self._domainname = domainname
         self._domain = None
-        self._manager = None
+        self._components = {}
 
         # event listeners
-        self._listeners = []
-
+        self._listeners = {
+           'event': [],
+           PORT_TYPE_WIDEBAND%'data': [],
+           PORT_TYPE_WIDEBAND%'sri': [],
+           PORT_TYPE_NARROWBAND%'data': [],
+           PORT_TYPE_NARROWBAND%'sri': []
+        }
+        
         self._survey = dict(frequency=None, demod=None)
         self._device = dict(type='rtl', status='unavailable')
         self._delayfunc = delayfunc
@@ -140,21 +152,44 @@ class RTLApp(object):
         '''
             Adds a listener for events
         '''
-        self._listeners.append(listener)
+        self._listeners['event'].append(listener)
 
     def rm_event_listener(self, listener):
         '''
             Removes a listener for events
         '''
         # FIXME: Is this thread safe
-        self._listeners.remove(listener)
+        self._listeners['event'].remove(listener)
+
+    def add_stream_listener(self, portname, data_listener, sri_listener=None):
+        '''
+             Adds a listener for streaming (SRI and Data).
+
+             e.g.
+             >>> add_stream_listener(PORTTYPE_WIDEBAND, my_data_listener, my_sri_listener)
+        '''
+        self._init_psd_listeners()
+        self._listeners[portname%'data'].append(data_listener)
+        if sri_listener:
+            self._listeners[portname%'sri'].append(sri_listener)
+
+    def rm_stream_listener(self, portname, data_listener, sri_listener=None):
+        '''
+             Adds a listener for streaming (SRI and Data).
+
+             e.g.
+             >>> add_stream_listener(PORTTYPE_WIDEBAND, my_data_listener, my_sri_listener)
+        '''
+        self._listeners[portname%'data'].remove(data_listener)
+        if sri_listener:
+            self._listeners[portname%'sri'].remove(sri_listener)
 
     def _post_event(self, etype, body):
         ''' 
             Internal method to post a new event
         '''
         e = dict(type=etype, body=body)
-        for l in self._listeners:
+        for l in self._listeners['event']:
             try:
                 l(e)
             except Exception, e:
@@ -173,32 +208,65 @@ class RTLApp(object):
             # self._odmListener.connect(self._domain)
         return self._domain
 
-    def _get_manager(self, timeout=0):
-        if not self._manager:
+    def _get_component(self, compname, timeout=0):
+        if not self._components.get(compname, None):
             t = time.time()
-            while not self._manager:
+            while not self._components.get(compname, None):
                 try:
-                    self._manager = _locate_component(self._get_domain(), 'RTL_FM_Controller_1')
+                    self._components[compname] = _locate_component(self._get_domain(), compname)
                 except IndexError:
                     delta = time.time() - t
                     if delta > timeout:
-                        print delta
                         raise
                     time.sleep(.1)
 
-        return self._manager
+        return self._components[compname]
+
+
+    def _get_manager(self, timeout=0):
+        return self._get_component('RTL_FM_Controller_1')
         
+
+    def  _init_psd_listeners(self):
+        self._push_sri_psd1 = self._generate_bulkio_callback(PORT_TYPE_WIDEBAND, 'sri')
+        self._push_packet_psd1 = self._generate_bulkio_callback(PORT_TYPE_WIDEBAND, 'data')
+        self._push_sri_psd2 = self._generate_bulkio_callback(PORT_TYPE_NARROWBAND, 'sri')
+        self._push_packet_psd2 = self._generate_bulkio_callback(PORT_TYPE_NARROWBAND, 'data')
+
+        port = self._get_component('psd_1').getPort('fft_dataFloat_out')
+        self._psd1_port = AsyncPort(AsyncPort.PORT_TYPE_FLOAT, self._push_sri_psd1, self._push_packet_psd1)
+        port.connectPort(self._psd1_port.getPort(), "psd1_%s" % id(self))
+        port = self._get_component('psd_2').getPort('fft_dataFloat_out')
+        self._psd2_port = AsyncPort(AsyncPort.PORT_TYPE_FLOAT, self._push_sri_psd2, self._push_packet_psd2)
+        port.connectPort(self._psd2_port.getPort(), "psd2_%s" % id(self))
+
+    def _generate_bulkio_callback(self, portname, data_type):
+        '''
+            Generates a callback function that 
+            a listener for a [port + data_type] combination.
+
+            Valid portnames: PORT_TYPE_*
+            Valid data types: 'sri' or 'data' (the bulkio packet)
+        '''
+
+        def bulkio_callback_func(*args):
+            for l in self._listeners[portname % data_type]:
+                try:
+                    l(*args)
+                except Exception, e:
+                    logging.exception('Error firing event %s to %s', e, l)
+        return bulkio_callback_func
+
 
     def _launch_waveform(self):
         try:
-            print self._get_domain().installApplication('/waveforms/Rtl_FM_Waveform/Rtl_FM_Waveform.sad.xml')
+            self._get_domain().installApplication('/waveforms/Rtl_FM_Waveform/Rtl_FM_Waveform.sad.xml')
         except CF.DomainManager.ApplicationAlreadyInstalled:
             logging.info("Waveform Rtl_FM_Waveform already installed", exc_info=1)
 
         for appFact in self._get_domain()._get_applicationFactories():
             if appFact._get_identifier() == self.RTL_FM_WAVEFORM_ID:
                 x = appFact.create('wave2', [], [])
-                print "GOT X %s" % x
                 x.start()
                 break
 
@@ -213,14 +281,13 @@ class RTLApp(object):
 
 
 def _locate_component(domain, ident):
-    logging.info("\n\nXXXXXX\nLooking for %s" % (ident,))
+    logging.debug("Looking for component %s", ident)
     idprefix = "%s:" % ident
     for app in domain.apps:
-        logging.info("\n\nXXXXXX\nLooking for %s in %s" % (ident, app._get_name()))
         for comp in app.comps:
-            logging.info("\n\nXXXXXX\nDoes %s match %s\n\nXXXXXX\n" % (ident, comp._id))
             if comp._id.startswith(idprefix):
                 return comp
+    logging.debug("Was not able to find component %s", ident)
     raise IndexError('No such identifier %s' % ident)
 
 

@@ -5,6 +5,7 @@ import rtl_app
 import time
 import collections
 from tornado import gen
+import logging
 
 class RTLAppTest(unittest.TestCase):
 
@@ -76,5 +77,31 @@ class RTLAppTest(unittest.TestCase):
 		self.test_survey(rtl_app.RTLApp("REDHAWK_DEV", lambda f: sys.stdout.write("Func %s\n" % f)))
 
 
+	def test_streaming(self, rtl=None):
+		sri_packet = [None]
+		data_packets = [0]
+
+		def sri_callback(data):
+			logging.debug("Got SRI %s", data)
+			sri_packet[0] = data
+
+		def data_callback(data, ts, EOS, stream_id):
+			logging.debug("Got data %d bytes", len(data))
+			data_packets[0] += 1
+
+		if not rtl:
+			#rtl = rtl_app.MockRTLApp("domain")
+			rtl = rtl_app.RTLApp("REDHAWK_DEV")
+
+		rtl.add_stream_listener(rtl.PORT_TYPE_WIDEBAND, data_callback, sri_callback)
+		rtl.add_stream_listener(rtl.PORT_TYPE_NARROWBAND, data_callback, sri_callback)
+		time.sleep(2)
+		if not sri_packet:
+			self.fail('Missing SRI packets')
+
+		if not data_packets:
+			self.fail('Missing Data packets')
+
 if __name__ == '__main__':
+	logging.basicConfig(level=logging.INFO)
 	unittest.main()
