@@ -60,8 +60,17 @@ class SurveyHandler(_RTLAppHandler):
             processing = self.rtl_app.get_available_processing()
             survey = yield self.rtl_app.get_survey()
 
-            self.write(dict(status=dict(frequency=survey['frequency'],
+            self.write(dict(success=True,
+                            status=dict(frequency=survey['frequency'],
                                         processing=survey['demod']),
+                            availableProcessing=processing))
+
+        # FIXME: 
+        except StandardError, e:
+            # unable to find domain
+            self.write(dict(success=True,
+                            status=dict(frequency=None,
+                                        processing=None),
                             availableProcessing=processing))
         except Exception:
             logging.exception("Error getting survey")

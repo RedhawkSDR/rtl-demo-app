@@ -40,6 +40,7 @@ class RTLApp(object):
         self._domainname = domainname
         self._domain = None
         self._components = {}
+        self._process = None
 
         # event listeners
         self._listeners = {
@@ -70,7 +71,7 @@ class RTLApp(object):
         '''
         try:
             return dict(frequency=int(1000000 * round(self._get_manager().Frequency, 4)), demod='fm')
-        except IndexError:
+        except (IndexError, StandardError):
             return dict(frequency=None, demod=None)
 
     def get_available_processing(self):
@@ -105,6 +106,7 @@ class RTLApp(object):
     @_delay
     def stop_survey(self):
         self._stop_waveform()
+        self._stop_application()    
         survey = dict(frequency=None, demod=None)
         self._post_event('survey', survey)
         return survey
@@ -178,9 +180,16 @@ class RTLApp(object):
              e.g.
              >>> add_stream_listener(PORTTYPE_WIDEBAND, my_data_listener, my_sri_listener)
         '''
-        self._listeners[portname%'data'].remove(data_listener)
+        try:
+            self._listeners[portname%'data'].remove(data_listener)
+        except ValueError:
+            pass
         if sri_listener:
-            self._listeners[portname%'sri'].remove(sri_listener)
+            try:
+                self._listeners[portname%'sri'].remove(sri_listener)
+            except ValueError:
+                pass
+
 
     def _post_event(self, etype, body):
         ''' 
@@ -199,14 +208,15 @@ class RTLApp(object):
             Returns the current connection to the domain,
             creating a connection if it's unavailable
         '''
+        self._start_application(self._domainname)
         if not self._domain:
             self._domain =  redhawk.attach(self._domainname)
-            self._odmListener = None
+            self._domain._odmListener = None
             # self._odmListener = ODMListener()
             # self._odmListener.connect(self._domain)
         return self._domain
 
-    def _get_component(self, compname, timeout=0):
+    def _get_component(self, compname, timeout=1):
         if not self._components.get(compname, None):
             t = time.time()
             while not self._components.get(compname, None):
@@ -276,6 +286,24 @@ class RTLApp(object):
         logging.info("Waveform 'wave2' not halted - not found")
 
 
+    def _start_application(self, domain):
+        if not self._process or self._process.poll() is not None:
+            logging.debug("Start domain %s", domain)
+            self._process = Popen(('../bin/startdomain.sh', '-d', domain), shell=False)
+            # FIXME: Determine if domain is running other than sleeping
+            time.sleep(1)
+
+    def _stop_application(self):
+        if self._process:
+            try:
+                logging.debug("stopping domain")
+                self._process.kill()
+                self._process.wait(2)
+            except OSError:
+                logging.warn("Unable to kill process %d" % self._process.pid, exc_info=1)
+        self._domain = None
+        self._components = {}
+        self._process = None
 
 
 def _locate_component(domain, ident):

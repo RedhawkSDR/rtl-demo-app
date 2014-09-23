@@ -11,7 +11,12 @@ class RTLAppTest(unittest.TestCase):
 
 	def setUp(self):
 		# clear the running waveform before tests
-		rtl_app.RTLApp("REDHAWK_DEV").stop_survey()
+		self.rtl_app = rtl_app.RTLApp("REDHAWK_DEV")
+		self.rtl_app.stop_survey()
+
+	def tearDown(self):
+		# clear the running waveform before tests
+		self.rtl_app.stop_survey()
 
 	def test_halt(self, rtl=None):
 		if not rtl:
