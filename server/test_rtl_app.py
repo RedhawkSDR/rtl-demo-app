@@ -19,19 +19,17 @@ class RTLAppTest(unittest.TestCase):
 		self.rtl_app.stop_survey()
 
 	def test_halt(self, rtl=None):
-		if not rtl:
-			#rtl = rtl_app.MockRTLApp("domain")
-			rtl = rtl_app.RTLApp("REDHAWK_DEV")
+		rtl = self.rtl_app
+
 		a = rtl.set_survey(frequency=101100000, demod='fm')
 		a = rtl.stop_survey()
 		self.assertEquals(None, a['frequency'])
 		self.assertEquals(None, a['demod'])
 
 
-	def test_survey(self, rtl=None):		
-		if not rtl:
-			#rtl = rtl_app.MockRTLApp("domain")
-			rtl = rtl_app.RTLApp("REDHAWK_DEV")
+	def test_survey(self):		
+		rtl = self.rtl_app
+
 
 		events = collections.deque()
 		def elisten(event):
@@ -77,12 +75,7 @@ class RTLAppTest(unittest.TestCase):
 
 		self.assertEquals(0, len(events))
 
-	def test_survey_delay(self):
-		#self.test_survey(rtl_app.MockRTLApp("domain", lambda f: sys.stdout.write("Func %s\n" % f)))
-		self.test_survey(rtl_app.RTLApp("REDHAWK_DEV", lambda f: sys.stdout.write("Func %s\n" % f)))
-
-
-	def test_streaming(self, rtl=None):
+	def test_streaming(self):
 		sri_packet = [None]
 		data_packets = [0]
 
@@ -94,9 +87,7 @@ class RTLAppTest(unittest.TestCase):
 			logging.debug("Got data %d bytes", len(data))
 			data_packets[0] += 1
 
-		if not rtl:
-			#rtl = rtl_app.MockRTLApp("domain")
-			rtl = rtl_app.RTLApp("REDHAWK_DEV")
+		rtl = self.rtl_app
 
 		rtl.add_stream_listener(rtl.PORT_TYPE_WIDEBAND, data_callback, sri_callback)
 		rtl.add_stream_listener(rtl.PORT_TYPE_NARROWBAND, data_callback, sri_callback)
