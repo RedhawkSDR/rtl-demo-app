@@ -65,13 +65,6 @@ class SurveyHandler(_RTLAppHandler):
                                         processing=survey['demod']),
                             availableProcessing=processing))
 
-        # FIXME: 
-        except StandardError, e:
-            # unable to find domain
-            self.write(dict(success=True,
-                            status=dict(frequency=None,
-                                        processing=None),
-                            availableProcessing=processing))
         except Exception:
             logging.exception("Error getting survey")
             self.set_status(500)

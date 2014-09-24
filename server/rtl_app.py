@@ -6,6 +6,7 @@ import time
 import logging
 import pprint
 import os
+import itertools
 from subprocess import Popen
 from functools import wraps
 from ossie.utils import redhawk
@@ -25,24 +26,33 @@ def _delay(func):
     return do_delay
 
 
-
 class RTLApp(object):
+
     SURVEY_DEMOD_LIST = [ "fm" ]
     FREQUENCY_RANGE = [1000000, 900000000]
     RTL_FM_WAVEFORM_ID = 'DCE:1ed946d9-3e77-4acc-8c2c-912641da6545'
     PORT_TYPE_WIDEBAND = 'wideband%s'
     PORT_TYPE_NARROWBAND = 'narrowband%s'
 
-    def __init__(self, domainname, delayfunc=lambda meth: None, rtlstatprog=None):
+    def __init__(self, domainname, delayfunc=lambda meth: None, rtlstatprog=None, domainprog=None, domainprogargs=[]):
         '''
               delayfunc - a function  delay function is invoked during a call.
         '''
         self._domainname = domainname
-        self._domain = None
-        self._components = {}
-        self._process = None
+        self._waveform_name = "rtl_waveform_%s" % id(self)
 
-        # event listeners
+        # initialize programs
+        bindir = "%s/../bin" % os.path.dirname(__import__(__name__).__file__)
+        if not rtlstatprog:
+            rtlstatprog = os.path.join(os.path.abspath(bindir), 'rtlstat.sh')
+        self._rtlstat = rtlstatprog
+
+        if not domainprog:
+            domainprog = os.path.join(os.path.abspath(bindir), 'startdomain.sh')
+        self._domainprog = domainprog
+        self._domainprogargs = domainprogargs
+
+        # initialize event listener dict
         self._listeners = {
            'event': [],
            RTLApp.PORT_TYPE_WIDEBAND%'data': [],
@@ -50,14 +60,29 @@ class RTLApp(object):
            RTLApp.PORT_TYPE_NARROWBAND%'data': [],
            RTLApp.PORT_TYPE_NARROWBAND%'sri': []
         }
-        
+
+        # create streaming callbacks (bridge between BULKIO callback and stream callback)
+        self._push_sri_psd1 = self._generate_bulkio_callback(self.PORT_TYPE_WIDEBAND, 'sri')
+        self._push_packet_psd1 = self._generate_bulkio_callback(self.PORT_TYPE_WIDEBAND, 'data')
+        self._push_sri_psd2 = self._generate_bulkio_callback(self.PORT_TYPE_NARROWBAND, 'sri')
+        self._push_packet_psd2 = self._generate_bulkio_callback(self.PORT_TYPE_NARROWBAND, 'data')
+
+        self._clear_redhawk()
+
+        # intialize default values
         self._survey = dict(frequency=None, demod=None)
         self._device = dict(type='rtl', status='unavailable')
+
         self._delayfunc = delayfunc
-        if not rtlstatprog:
-            bindir = "%s/../bin" % os.path.dirname(__import__(__name__).__file__)
-            rtlstatprog = os.path.join(os.path.abspath(bindir), 'rtlstat.sh')
-        self._rtlstat = rtlstatprog
+
+    def _clear_redhawk(self):
+        # clear the REDHAWK cache
+        self._domain = None
+        self._components = {}
+        self._process = None
+        self._waveform = None
+        self._psd1_port = None
+        self._psd2_port = None
 
     @_delay
     def get_survey(self):
@@ -92,21 +117,19 @@ class RTLApp(object):
         if frequency < self.FREQUENCY_RANGE[0] or frequency > self.FREQUENCY_RANGE[1]:
             raise BadFrequencyException(frequency)
 
-        try:
-            comp = self._get_manager()
-        except IndexError:
-            self._launch_waveform()
-            comp = self._get_manager(timeout=timeout)
-
+        # try to initialize the application
+        self._launch_waveform()
+        comp = self._get_manager(timeout=timeout)
         comp.Frequency = (frequency / 1000000.0)
         survey = dict(frequency=int(1000000 * round(comp.Frequency, 4)), demod='fm')
+
         self._post_event('survey', survey)
         return survey
 
     @_delay
     def stop_survey(self):
-        self._stop_waveform()
-        self._stop_application()    
+        self._stop_application()
+
         survey = dict(frequency=None, demod=None)
         self._post_event('survey', survey)
         return survey
@@ -168,7 +191,6 @@ class RTLApp(object):
              e.g.
              >>> add_stream_listener(PORTTYPE_WIDEBAND, my_data_listener, my_sri_listener)
         '''
-        self._init_psd_listeners()
         self._listeners[portname%'data'].append(data_listener)
         if sri_listener:
             self._listeners[portname%'sri'].append(sri_listener)
@@ -208,12 +230,8 @@ class RTLApp(object):
             Returns the current connection to the domain,
             creating a connection if it's unavailable
         '''
-        self._start_application(self._domainname)
         if not self._domain:
-            self._domain =  redhawk.attach(self._domainname)
-            self._domain._odmListener = None
-            # self._odmListener = ODMListener()
-            # self._odmListener.connect(self._domain)
+            self._init_application()
         return self._domain
 
     def _get_component(self, compname, timeout=1):
@@ -234,19 +252,16 @@ class RTLApp(object):
     def _get_manager(self, timeout=0):
         return self._get_component('RTL_FM_Controller_1')
         
-
     def  _init_psd_listeners(self):
-        self._push_sri_psd1 = self._generate_bulkio_callback(self.PORT_TYPE_WIDEBAND, 'sri')
-        self._push_packet_psd1 = self._generate_bulkio_callback(self.PORT_TYPE_WIDEBAND, 'data')
-        self._push_sri_psd2 = self._generate_bulkio_callback(self.PORT_TYPE_NARROWBAND, 'sri')
-        self._push_packet_psd2 = self._generate_bulkio_callback(self.PORT_TYPE_NARROWBAND, 'data')
+        if not self._psd1_port:
+            port = self._get_component('psd_1').getPort('fft_dataFloat_out')
+            self._psd1_port = AsyncPort(AsyncPort.PORT_TYPE_FLOAT, self._push_sri_psd1, self._push_packet_psd1)
+            port.connectPort(self._psd1_port.getPort(), "psd1_%s" % id(self))
 
-        port = self._get_component('psd_1').getPort('fft_dataFloat_out')
-        self._psd1_port = AsyncPort(AsyncPort.PORT_TYPE_FLOAT, self._push_sri_psd1, self._push_packet_psd1)
-        port.connectPort(self._psd1_port.getPort(), "psd1_%s" % id(self))
-        port = self._get_component('psd_2').getPort('fft_dataFloat_out')
-        self._psd2_port = AsyncPort(AsyncPort.PORT_TYPE_FLOAT, self._push_sri_psd2, self._push_packet_psd2)
-        port.connectPort(self._psd2_port.getPort(), "psd2_%s" % id(self))
+        if not self._psd2_port:    
+            port = self._get_component('psd_2').getPort('fft_dataFloat_out')
+            self._psd2_port = AsyncPort(AsyncPort.PORT_TYPE_FLOAT, self._push_sri_psd2, self._push_packet_psd2)
+            port.connectPort(self._psd2_port.getPort(), "psd2_%s" % id(self))
 
     def _generate_bulkio_callback(self, portname, data_type):
         '''
@@ -265,45 +280,61 @@ class RTLApp(object):
                     logging.exception('Error firing event %s to %s', args, l)
         return bulkio_callback_func
 
+    def _init_application(self):
+        self._start_application()
+        self._domain =  redhawk.attach(self._domainname)
+        self._domain._odmListener = None
+        # self._odmListener = ODMListener()
+        # self._odmListener.connect(self._domain)
 
-    def _launch_waveform(self):
-        try:
-            self._get_domain().installApplication('/waveforms/Rtl_FM_Waveform/Rtl_FM_Waveform.sad.xml')
-        except CF.DomainManager.ApplicationAlreadyInstalled:
-            logging.info("Waveform Rtl_FM_Waveform already installed", exc_info=1)
-
-        for appFact in self._get_domain()._get_applicationFactories():
-            if appFact._get_identifier() == self.RTL_FM_WAVEFORM_ID:
-                x = appFact.create('wave2', [], [])
-                x.start()
-                break
-
-    def _stop_waveform(self):
-        for a in self._get_domain().apps:
-            if a._get_name() == 'wave2':
-                a.releaseObject()
-                return
-        logging.info("Waveform 'wave2' not halted - not found")
-
-
-    def _start_application(self, domain):
+    def _start_application(self):
         if not self._process or self._process.poll() is not None:
-            logging.debug("Start domain %s", domain)
-            self._process = Popen(('../bin/startdomain.sh', '-d', domain), shell=False)
+            logging.debug("Start domain %s", self._domainname)
+            self._process = Popen(itertools.chain((self._domainprog, '-d', self._domainname), self._domainprogargs),
+                                  shell=False)
             # FIXME: Determine if domain is running other than sleeping
             time.sleep(1)
 
     def _stop_application(self):
         if self._process:
             try:
-                logging.debug("stopping domain")
+                logging.debug("Stopping domain %s", self._domainname)
                 self._process.kill()
-                self._process.wait(2)
+                self._process.send_signal(1)
+                self._process.wait(2) #FIXME: not hard coded
             except OSError:
                 logging.warn("Unable to kill process %d" % self._process.pid, exc_info=1)
-        self._domain = None
-        self._components = {}
-        self._process = None
+        self._clear_redhawk()
+
+
+    def _launch_waveform(self):
+        if self._waveform:
+            return
+
+        try:        
+            self._waveform = self._get_domain().createApplication('Rtl_FM_Waveform')
+            self._waveform_name = self._waveform.name
+            self._waveform.start()
+            self._init_psd_listeners()
+        except Exception:
+            logging.exception("Unable to start waveform")
+            raise
+        # try:
+        #     self._domain.installApplication('/waveforms/Rtl_FM_Waveform/Rtl_FM_Waveform.sad.xml')
+        # except CF.DomainManager.ApplicationAlreadyInstalled:
+        #     logging.info("Waveform Rtl_FM_Waveform already installed", exc_info=1)
+
+        # for appFact in self._get_domain()._get_applicationFactories():
+        #     if appFact._get_identifier() == self.RTL_FM_WAVEFORM_ID:
+        #         try:
+        #         break
+
+    def _stop_waveform(self):
+        for a in self._get_domain().apps:
+            if a._get_name() == self._waveform_name:
+                a.releaseObject()
+                return
+        logging.info("Waveform '%s' not halted - not found", self._waveform_name)
 
 
 def _locate_component(domain, ident):
