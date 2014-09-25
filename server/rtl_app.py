@@ -128,6 +128,7 @@ class RTLApp(object):
 
     @_delay
     def stop_survey(self):
+        self._stop_waveform()
         self._stop_application()
 
         survey = dict(frequency=None, demod=None)
@@ -296,10 +297,11 @@ class RTLApp(object):
             time.sleep(1)
 
     def _stop_application(self):
+        self._stop_waveform()
         if self._process:
             try:
                 logging.debug("Stopping domain %s", self._domainname)
-                self._process.kill()
+                # self._process.kill()
                 self._process.send_signal(1)
                 self._process.wait(2) #FIXME: not hard coded
             except OSError:
@@ -330,11 +332,17 @@ class RTLApp(object):
         #         break
 
     def _stop_waveform(self):
-        for a in self._get_domain().apps:
-            if a._get_name() == self._waveform_name:
-                a.releaseObject()
-                return
-        logging.info("Waveform '%s' not halted - not found", self._waveform_name)
+        if self._waveform:
+            self._waveform.releaseObject()
+            self._waveform = None
+
+        # for a in self._get_domain().apps:
+        #     if a._get_name() == self._waveform_name:
+        #         a.releaseObject()
+        #         self._waveform = None
+        #         break
+        # else:
+        #     logging.info("Waveform '%s' not halted - not found", self._waveform_name)
 
 
 def _locate_component(domain, ident):

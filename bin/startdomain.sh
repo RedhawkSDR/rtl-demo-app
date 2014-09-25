@@ -27,6 +27,12 @@ err() {
     exit 1
 }
 
+killif() {
+   for pid in "$@" ; do
+      [ -e /proc/$pid ] && /usr/bin/kill -1 "$pid" 
+   done
+}
+
 while getopts "hsd:" opt ; do
     case "$opt" in 
         s) DIGITIZER_NODE=/nodes/sim_RX_DIGITIZER_Node/DeviceManager.dcd.xml
@@ -40,14 +46,14 @@ done
 pids=
 
 # kill all remaining subprocesses at exit
-trap 'kill -1 $pids' 0
+trap 'killif $pids' 0 1 2 15
 
 mkdir -p logs || err
 
 sed -i "/refid=.DomainName/ s/value=[$QUOTES][^$QUOTES]*[$QUOTES]/value=$DQUOTE$RHDOMAIN$DQUOTE/" "$SDRROOT/dom/waveforms/Rtl_FM_Waveform/Rtl_FM_Waveform.sad.xml" || err
 
 #NBARGS=--force-rebind --nopersist
-NBARGS=
+NBARGS=--nopersist
 
 # Domain Manager
 nodeBooter $NBARGS -D /domain/DomainManager.dmd.xml --domainname $RHDOMAIN > logs/domain.log 2>&1 || err &
