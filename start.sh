@@ -5,6 +5,11 @@ SCRIPT=$(readlink -f "$0")
 # Absolute path this script is in, thus /home/user/bin
 SCRIPTPATH=$(dirname "$SCRIPT")
 
-venv="${SCRIPTPATH}/.virtualenv"
+pyvenv="${SCRIPTPATH}/pyvenv"
+if [ ! -f ${pyvenv} ]; then
+  pyvenv=/var/redhawk/web/bin/pyvenv
+fi
 
-exec ${SCRIPTPATH}/pyvenv python ${SCRIPTPATH}/server/server.py $@
+source /etc/profile.d/redhawk.sh
+
+exec ${pyvenv} python ${SCRIPTPATH}/server/server.py $@

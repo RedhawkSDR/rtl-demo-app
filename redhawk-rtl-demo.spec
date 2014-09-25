@@ -42,6 +42,8 @@ Requires:       python
 Requires:       redhawk >= 1.10
 Requires:       redhawk-devel
 Requires:       redhawk-web
+Requires:       rhweb-python-tornado
+Requires:       rhweb-python-gevent
 BuildRequires:  npm
 BuildRequires:  git
 
@@ -63,14 +65,11 @@ npm install
 cd -
 
 mkdir -p $RPM_BUILD_ROOT%{_rtl_demo}
-#cp -R rtl-demo-app $RPM_BUILD_ROOT%{_rtl_app}
 cp -R rtl-demo-client/dist $RPM_BUILD_ROOT%{_rtl_client}
 
 mkdir -p $RPM_BUILD_ROOT%{_rtl_app}
 cp -R rtl-demo-app/bin rtl-demo-app/server $RPM_BUILD_ROOT%{_rtl_app}
 cp rtl-demo-app/start.sh          $RPM_BUILD_ROOT%{_rtl_app}
-cp rtl-demo-app/pyvenv            $RPM_BUILD_ROOT%{_rtl_app}
-cp rtl-demo-app/setup.sh          $RPM_BUILD_ROOT%{_rtl_app}
 
 
 mkdir -p $RPM_BUILD_ROOT%{_supervisor}
@@ -78,12 +77,6 @@ cp rtl-demo-app/deploy/rtl-demo-supervisor.conf $RPM_BUILD_ROOT%{_supervisor}/re
 
 mkdir -p $RPM_BUILD_ROOT%{_nginx}/redhawk-sites
 cp rtl-demo-app/deploy/rtl-demo-nginx.conf $RPM_BUILD_ROOT%{_nginx}/rtl-demo.enabled
-
-%post
-$RPM_BUILD_ROOT%{_rtl_app}/setup.sh install
-
-%preun
-$RPM_BUILD_ROOT%{_rtl_app}/setup.sh uninstall
 
 %clean
 rm -rf %{buildroot}
@@ -94,8 +87,6 @@ rm -rf %{buildroot}
 
 %dir %{_rtl_app}
 %{_rtl_app}/start.sh
-%{_rtl_app}/setup.sh
-%{_rtl_app}/pyvenv
 %{_rtl_app}/bin
 %{_rtl_app}/server
 
