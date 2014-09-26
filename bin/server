@@ -1,0 +1,4 @@
+#!/bin/sh -e
+thisdir=`dirname "$0"`
+thisdir=`cd "$thisdir" && pwd`
+exec /usr/bin/python "$thisdir/../server/server.py" "$@"

@@ -5,6 +5,7 @@ thisdir=`cd "$thisdir" && pwd`
 export LD_LIBRARY_PATH=/usr/local/lib:/usr/local/redhawk/core/lib64
 export PATH=$PATH:/usr/local/redhawk/core/bin
 export SDRROOT="$thisdir"/sdr
+export LOGDIR="$SDRROOT"/dom/logs
 export RHDOMAIN=REDHAWK_DEV
 
 DIGITIZER_NODE=/nodes/RTL2832_Node/DeviceManager.dcd.xml
@@ -50,8 +51,13 @@ pids=
 # kill all remaining subprocesses at exit
 trap 'killif $pids' 0 1 2 15
 
-mkdir -p logs || err
+mkdir -p "$LOGDIR" || err
+if [ ! -e $SDRROOT/dom/waveforms/Rtl_FM_Waveform ] ; then
+    "$thisdir"/mksdr.sh || err
+fi
 
+# FIXME:  Should be waveform init properties from the rtl app
+# modify the domain name and Front end device in waveform
 sed -i "/refid=.DomainName/ s/value=[$QUOTES][^$QUOTES]*[$QUOTES]/value=${DQUOTE}${RHDOMAIN}${DQUOTE}/
         /refid=.FEIDeviceName/ s/value=[$QUOTES][^$QUOTES]*[$QUOTES]/value=${DQUOTE}${FEIDEVICE}${DQUOTE}/" \
               "$SDRROOT/dom/waveforms/Rtl_FM_Waveform/Rtl_FM_Waveform.sad.xml" || err
@@ -60,25 +66,18 @@ sed -i "/refid=.DomainName/ s/value=[$QUOTES][^$QUOTES]*[$QUOTES]/value=${DQUOTE
 NBARGS=--nopersist
 
 # Domain Manager
-nodeBooter $NBARGS -D /domain/DomainManager.dmd.xml --domainname $RHDOMAIN > logs/domain.log 2>&1 || err &
+nodeBooter $NBARGS -D /domain/DomainManager.dmd.xml --domainname $RHDOMAIN > "$LOGDIR"/domain.log 2>&1 || err &
 pids=$!
 
 # GPP
-nodeBooter $NBARGS -d /nodes/DevMgr_rhdemo1/DeviceManager.dcd.xml --domainname $RHDOMAIN > logs/gpp.log 2>&1 || err &
+nodeBooter $NBARGS -d /nodes/DevMgr_rhdemo1/DeviceManager.dcd.xml --domainname $RHDOMAIN > "$LOGDIR"/gpp.log 2>&1 || err &
 pids="$pids $!"
 
 # Digitizer
-nodeBooter $NBARGS -d "$DIGITIZER_NODE" --domainname $RHDOMAIN > logs/digitizer.log  2>&1 || err &
+nodeBooter $NBARGS -d "$DIGITIZER_NODE" --domainname $RHDOMAIN > "$LOGDIR"/digitizer.log  2>&1 || err &
 pids="$pids $!"
 
 echo "Started $RHDOMAIN domain $startmsg. Use Ctrl-C to halt"
-
-#FIXME: sleeps are horrible. Better to wait for device manager initializatio to complete
-# before launching
-#sleep 2
-#scaclt install REDHAWK_DEV /waveforms/Rtl_FM_Waveform/Rtl_FM_Waveform.sad.xml
-#scaclt create REDHAWK_DEV DCE:1ed946d9-3e77-4acc-8c2c-912641da6545 wform_21
-
 
 # block until all subprocesses are killed. 
 wait $pids

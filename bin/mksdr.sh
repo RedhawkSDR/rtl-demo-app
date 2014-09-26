@@ -1,4 +1,4 @@
-#!/bin/sh -x
+#!/bin/sh -ex
 ./copysdr.sh /dev/mgr
 ./copysdr.sh /dom/mgr
 ./copysdr.sh /dev/devices/GPP
