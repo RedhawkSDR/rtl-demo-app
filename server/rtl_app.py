@@ -129,7 +129,7 @@ class RTLApp(object):
     @_delay
     def stop_survey(self):
         self._stop_waveform()
-        self._stop_application()
+        self._stop_domain()
 
         survey = dict(frequency=None, demod=None)
         self._post_event('survey', survey)
@@ -282,21 +282,23 @@ class RTLApp(object):
         return bulkio_callback_func
 
     def _init_application(self):
-        self._start_application()
+        self._start_domain()
         self._domain =  redhawk.attach(self._domainname)
-        self._domain._odmListener = None
+        #self._domain._odmListener = None
         # self._odmListener = ODMListener()
         # self._odmListener.connect(self._domain)
 
-    def _start_application(self):
+    def _start_domain(self):
         if not self._process or self._process.poll() is not None:
             logging.debug("Start domain %s", self._domainname)
             self._process = Popen(itertools.chain((self._domainprog, '-d', self._domainname), self._domainprogargs),
                                   shell=False)
             # FIXME: Determine if domain is running other than sleeping
-            time.sleep(1)
+            logging.debug("Started domain %s pid=%d", self._domainname, self._process.pid)
+            time.sleep(30)
+            logging.debug("Sleep done")
 
-    def _stop_application(self):
+    def _stop_domain(self):
         self._stop_waveform()
         if self._process:
             try:
@@ -314,10 +316,19 @@ class RTLApp(object):
             return
 
         try:        
+            logging.info("About to create Rtl_FM_Waveform")
+            # import pdb
+            # pdb.set_trace()
             self._waveform = self._get_domain().createApplication('Rtl_FM_Waveform')
             self._waveform_name = self._waveform.name
+            #FIXME: sleeps are evil
+            time.sleep(1)
+            logging.info("Waveform %s created", self._waveform_name)
             self._waveform.start()
+            logging.info("Waveform %s started", self._waveform_name)
+            time.sleep(2)
             self._init_psd_listeners()
+            logging.info("PSD listeners initialized", self._waveform_name)
         except Exception:
             logging.exception("Unable to start waveform")
             raise
