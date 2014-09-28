@@ -42,7 +42,8 @@ class RTLApp(object):
         self._waveform_name = "rtl_waveform_%s" % id(self)
 
         # initialize programs
-        bindir = "%s/../bin" % os.path.dirname(__import__(__name__).__file__)
+        bindir = "%s/../bin" % os.path.abspath(os.path.dirname(__import__(__name__).__file__))
+        logging.info("BINDIR %s", bindir)
         if not rtlstatprog:
             rtlstatprog = os.path.join(os.path.abspath(bindir), 'rtlstat.sh')
         self._rtlstat = rtlstatprog
@@ -291,8 +292,13 @@ class RTLApp(object):
     def _start_domain(self):
         if not self._process or self._process.poll() is not None:
             logging.debug("Start domain %s", self._domainname)
-            self._process = Popen(itertools.chain((self._domainprog, '-d', self._domainname), self._domainprogargs),
-                                  shell=False)
+            try:
+                self._process = Popen(itertools.chain((self._domainprog, '-d', self._domainname), self._domainprogargs),
+                                      shell=False)
+            except OSError, e:
+                logging.exception("Error starting domain with command %s", self._domainprog)
+                raise
+
             # FIXME: Determine if domain is running other than sleeping
             logging.debug("Started domain %s pid=%d", self._domainname, self._process.pid)
             time.sleep(30)
