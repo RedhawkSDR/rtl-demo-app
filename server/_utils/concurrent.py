@@ -1,12 +1,17 @@
 # do this as early as possible in your application
 #from gevent import monkey; monkey.patch_all()
 
-import functools
+from functools import wraps, partial
 from tornado import gen, concurrent
 from tornado import ioloop
-import gevent
+import futures
 import logging
 import sys
+from futures import ThreadPoolExecutor
+
+EXECUTOR = ThreadPoolExecutor(4)
+
+
 
 _LINE='%'*40
 
@@ -16,7 +21,7 @@ def safe_return_future(func):
         thread safety.  Executes the callback in 
         the ioloop thread
     '''
-    @functools.wraps(func)
+    @wraps(func)
     def exec_func(*args, **kwargs):
 
         future = concurrent.TracebackFuture()
@@ -33,12 +38,15 @@ def safe_return_future(func):
                 io_loop = ioloop.IOLoop.current()
            
             def _ioloop_callback(val):
+                # print "set result to %s" % val
                 future.set_result(val)
 
             def _callback(val):
                 # set the result in the ioloop thread
+                # print "callback val is %s " % val
                 io_loop.add_callback(_ioloop_callback, val)
 
+            # print "Func %s " % func
             func(callback=_callback, *args, **kwargs)
         except Exception:
             future.set_exc_info(sys.exc_info())
@@ -55,10 +63,10 @@ def safe_return_future(func):
 
 def background_task(func):
 
-    @functools.wraps(func)
+    @wraps(func)
     def exec_background(*args, **kwargs):
         '''
-            Executes a function in a background Greenlet thread
+            Executes a function in a background thread
             and returns a Future invoked when the thread completes.
             Useful for IO Bound processes that block.  For CPU
             bound processes consider using celery, DO NOT execute
@@ -92,7 +100,7 @@ def background_task(func):
                 io_loop.add_callback(future.set_exc_info, sys.exc_info())
 
 
-        gevent.spawn(_do_task, *args, **kwargs)
+        EXECUTOR.submit(partial(_do_task, *args, **kwargs))
         return future
     exec_background.__doc__ = \
      ("%s\nbackground_task() wrapped function.\n" + \

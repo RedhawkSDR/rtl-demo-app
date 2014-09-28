@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 # do this as early as possible in your application
-from gevent import monkey; monkey.patch_all()
+#from gevent import monkey; monkey.patch_all()
 
 # system imports
 import json
@@ -18,7 +18,7 @@ from tornado.httpclient import AsyncHTTPClient
 from tornado import web
 from tornado import websocket
 from tornado import gen
-import gevent
+#import gevent
 import threading
 
 # application imports
