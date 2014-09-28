@@ -52,7 +52,7 @@ pids=
 trap 'killif $pids' 0 1 2 15
 
 mkdir -p "$LOGDIR" || err
-if [ ! -e $SDRROOT/dom/waveforms/Rtl_FM_Waveform ] ; then
+if [ ! -e $SDRROOT/dom/waveforms/RTL_FM_Waveform ] ; then
     "$thisdir"/mksdr.sh || err
 fi
 
@@ -60,7 +60,7 @@ fi
 # modify the domain name and Front end device in waveform
 sed -i "/refid=.DomainName/ s/value=[$QUOTES][^$QUOTES]*[$QUOTES]/value=${DQUOTE}${RHDOMAIN}${DQUOTE}/
         /refid=.FEIDeviceName/ s/value=[$QUOTES][^$QUOTES]*[$QUOTES]/value=${DQUOTE}${FEIDEVICE}${DQUOTE}/" \
-              "$SDRROOT/dom/waveforms/Rtl_FM_Waveform/Rtl_FM_Waveform.sad.xml" || err
+              "$SDRROOT/dom/waveforms/RTL_FM_Waveform/RTL_FM_Waveform.sad.xml" || err
 
 #NBARGS=--force-rebind --nopersist
 NBARGS=--nopersist
@@ -70,7 +70,7 @@ nodeBooter $NBARGS -D /domain/DomainManager.dmd.xml --domainname $RHDOMAIN > "$L
 pids=$!
 
 # GPP
-nodeBooter $NBARGS -d /nodes/DevMgr_rhdemo1/DeviceManager.dcd.xml --domainname $RHDOMAIN > "$LOGDIR"/gpp.log 2>&1 || err &
+nodeBooter $NBARGS -d /nodes/DevMgr_${HOST}/DeviceManager.dcd.xml --domainname $RHDOMAIN > "$LOGDIR"/gpp.log 2>&1 || err &
 pids="$pids $!"
 
 # Digitizer

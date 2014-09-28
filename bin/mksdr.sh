@@ -4,7 +4,7 @@
 ./copysdr.sh /dev/devices/GPP
 ./copysdr.sh /dev/devices/RTL2832U
 ./copysdr.sh /dev/devices/sim_RX_DIGITIZER
-./copysdr.sh /dev/nodes/DevMgr_rhdemo1
+./copysdr.sh /dev/nodes/DevMgr_${HOST}
 ./copysdr.sh /dev/nodes/RTL2832_Node
 ./copysdr.sh /dev/nodes/sim_RX_DIGITIZER_Node
 ./copysdr.sh /dom/components/agc
@@ -18,5 +18,5 @@
 ./copysdr.sh /dom/deps/dsp
 ./copysdr.sh /dom/deps/fftlib
 ./copysdr.sh /dom/domain
-./copysdr.sh /dom/waveforms/Rtl_FM_Waveform
+./copysdr.sh /dom/waveforms/RTL_FM_Waveform
 

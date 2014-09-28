@@ -319,7 +319,7 @@ class RTLApp(object):
             logging.info("About to create Rtl_FM_Waveform")
             # import pdb
             # pdb.set_trace()
-            self._waveform = self._get_domain().createApplication('Rtl_FM_Waveform')
+            self._waveform = self._get_domain().createApplication('RTL_FM_Waveform')
             self._waveform_name = self._waveform.name
             #FIXME: sleeps are evil
             time.sleep(1)
