@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/sh -e
 
 # Absolute path to this script, e.g. /home/user/bin/foo.sh
 SCRIPT=$(readlink -f "$0")
@@ -17,10 +17,7 @@ case "$1" in
     fi
 
     virtualenv --system-site-packages ${venv}
-    ${pyvenv} easy_install "tornado==4.0.1"
-    ${pyvenv} easy_install "gevent==1.0.1"
-
-    chown -R redhawk:redhawk ${venv}
+    ${pyvenv} pip install -r requirements.txt
   ;;
 
   uninstall)
