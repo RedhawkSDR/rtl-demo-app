@@ -1,17 +1,18 @@
 #!/usr/bin/env python
-from gevent import monkey; monkey.patch_all()
 
 import unittest
 import sys
 import logging
 import time
 
-import gevent
 from tornado import gen
 from tornado.testing import AsyncTestCase, LogTrapTestCase, main, gen_test
 
+from futures import ThreadPoolExecutor
 
-import concurrent
+import tasking
+
+EXECUTOR = ThreadPoolExecutor(4)
 
 # all method returning suite is required by tornado.testing.main()
 def all():
@@ -20,7 +21,7 @@ def all():
 
 class FuturesTest(AsyncTestCase):
 
-	@concurrent.background_task
+	@tasking.background_task
 	def _sleepfunc(self, input, duration=1, exception=False):
 		logging.debug("_sleepfun start")
 		time.sleep(duration)
@@ -60,7 +61,6 @@ class FuturesTest(AsyncTestCase):
 		f = self._sleepfunc(ValueError('ignore me'), 1, exception=True)
 		logging.debug("The future is %s", f)
 		self.io_loop.add_future(f, self.stop)
-		gevent.sleep(0)
 		f2 = self.wait()
 		# print "RESULT IS '%s'" % self.wait()
 		self.assertEquals(ValueError, type(f2.exception()))
@@ -69,14 +69,14 @@ class FuturesTest(AsyncTestCase):
 	@gen_test
 	def test_callback_future(self):
 
-		@concurrent.safe_return_future
+		@tasking.safe_return_future
 		def cbfunc(input, duration=1, callback=None):
 			logging.debug("input=%s, callback=%s", input, callback)
 			def background(i):
 				logging.debug("invoking cbfunc")
 				time.sleep(duration)
 				callback(i)
-			gevent.spawn(background, input)
+			EXECUTOR.submit(background, input)
 
 		f = yield cbfunc("the input is 1", 1)
 		logging.debug("The future is %s", f)

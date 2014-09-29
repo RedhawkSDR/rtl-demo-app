@@ -7,7 +7,7 @@ from functools import wraps
 import logging
 
 from _common import BadDemodException, BadFrequencyException
-from _utils.concurrent import background_task, safe_return_future
+from _utils.tasking import background_task, safe_return_future
 
 def _delay(func):
 

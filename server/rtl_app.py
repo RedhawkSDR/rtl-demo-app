@@ -15,7 +15,7 @@ from ossie.cf import StandardEvent, ExtendedEvent, CF
 from rest.asyncport import AsyncPort
 
 from _common import BadDemodException, BadFrequencyException
-from _utils.concurrent import background_task, safe_return_future
+from _utils.tasking import background_task, safe_return_future
 
 def _delay(func):
 
@@ -301,7 +301,7 @@ class RTLApp(object):
 
             # FIXME: Determine if domain is running other than sleeping
             logging.debug("Started domain %s pid=%d", self._domainname, self._process.pid)
-            time.sleep(30)
+            time.sleep(1)
             logging.debug("Sleep done")
 
     def _stop_domain(self):

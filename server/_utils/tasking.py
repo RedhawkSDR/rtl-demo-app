@@ -1,6 +1,3 @@
-# do this as early as possible in your application
-#from gevent import monkey; monkey.patch_all()
-
 from functools import wraps, partial
 from tornado import gen, concurrent
 from tornado import ioloop
