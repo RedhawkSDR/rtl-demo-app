@@ -74,6 +74,8 @@ cp rtl-demo-app/start.sh          $RPM_BUILD_ROOT%{_rtl_app}
 
 mkdir -p $RPM_BUILD_ROOT%{_supervisor}
 cp rtl-demo-app/deploy/rtl-demo-supervisor.conf $RPM_BUILD_ROOT%{_supervisor}/redhawk-rtl-demo.conf
+cp rtl-demo-app/deploy/rtl-demo-domain-supervisor.conf $RPM_BUILD_ROOT%{_supervisor}/redhawk-rtl-demo-domain.conf
+
 
 mkdir -p $RPM_BUILD_ROOT%{_nginx}/redhawk-sites
 cp rtl-demo-app/deploy/rtl-demo-nginx.conf $RPM_BUILD_ROOT%{_nginx}/rtl-demo.enabled
@@ -98,4 +100,4 @@ rm -rf %{buildroot}
 %defattr(-,root,root,-)
 %{_nginx}/rtl-demo.enabled
 %{_supervisor}/redhawk-rtl-demo.conf
-
+%{_supervisor}/redhawk-rtl-demo-domain.conf

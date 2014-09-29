@@ -1,4 +1,7 @@
 #!/bin/sh
+
+source /etc/profile.d/redhawk.sh
+
 thisdir=`dirname "$0"`
 thisdir=`cd "$thisdir" && pwd`
 

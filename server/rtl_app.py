@@ -283,7 +283,6 @@ class RTLApp(object):
         return bulkio_callback_func
 
     def _init_application(self):
-        self._start_domain()
         self._domain =  redhawk.attach(self._domainname)
         #self._domain._odmListener = None
         # self._odmListener = ODMListener()
@@ -306,14 +305,6 @@ class RTLApp(object):
 
     def _stop_domain(self):
         self._stop_waveform()
-        if self._process:
-            try:
-                logging.debug("Stopping domain %s", self._domainname)
-                # self._process.kill()
-                self._process.send_signal(1)
-                self._process.wait(2) #FIXME: not hard coded
-            except OSError:
-                logging.warn("Unable to kill process %d" % self._process.pid, exc_info=1)
         self._clear_redhawk()
 
 
