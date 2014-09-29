@@ -256,12 +256,12 @@ class RTLApp(object):
         
     def  _init_psd_listeners(self):
         if not self._psd1_port:
-            port = self._get_component('psd_1').getPort('fft_dataFloat_out')
+            port = self._get_component('psd_1').getPort('psd_dataFloat_out')
             self._psd1_port = AsyncPort(AsyncPort.PORT_TYPE_FLOAT, self._push_sri_psd1, self._push_packet_psd1)
             port.connectPort(self._psd1_port.getPort(), "psd1_%s" % id(self))
 
         if not self._psd2_port:    
-            port = self._get_component('psd_2').getPort('fft_dataFloat_out')
+            port = self._get_component('psd_2').getPort('psd_dataFloat_out')
             self._psd2_port = AsyncPort(AsyncPort.PORT_TYPE_FLOAT, self._push_sri_psd2, self._push_packet_psd2)
             port.connectPort(self._psd2_port.getPort(), "psd2_%s" % id(self))
 
