@@ -70,7 +70,7 @@ nodeBooter $NBARGS -D /domain/DomainManager.dmd.xml --domainname $RHDOMAIN > "$L
 pids=$!
 
 # GPP
-nodeBooter $NBARGS -d /nodes/DevMgr_${HOST}/DeviceManager.dcd.xml --domainname $RHDOMAIN > "$LOGDIR"/gpp.log 2>&1 || err &
+nodeBooter $NBARGS -d /nodes/RTL-GPP-Node/DeviceManager.dcd.xml --domainname $RHDOMAIN > "$LOGDIR"/gpp.log 2>&1 || err &
 pids="$pids $!"
 
 # Digitizer

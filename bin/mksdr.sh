@@ -1,11 +1,14 @@
 #!/bin/sh -ex
+thisdir=`dirname "$0"`
+thisdir=`cd "$thisdir" && pwd`
+
 ./copysdr.sh /dev/mgr
 ./copysdr.sh /dom/mgr
 ./copysdr.sh /dom/domain
 
 # GPP Node
 ./copysdr.sh /dev/devices/GPP
-./copysdr.sh /dev/nodes/DevMgr_${HOSTNAME}
+./copysdr.sh -s "$thisdir"/../deploy /dev/nodes/RTL-GPP-Node
 
 # RTL Front End device
 ./copysdr.sh /dev/devices/RTL2832U
