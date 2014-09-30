@@ -316,7 +316,7 @@ class RTLApp(object):
             logging.info("Waveform %s started", self._waveform_name)
             time.sleep(2)
             self._init_psd_listeners()
-            logging.info("PSD listeners initialized", self._waveform_name)
+            logging.info("PSD listeners initialized %s", self._waveform_name)
         except Exception:
             logging.exception("Unable to start waveform")
             raise
