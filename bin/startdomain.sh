@@ -1,17 +1,12 @@
 #!/bin/sh
 
-source /etc/profile.d/redhawk.sh
-
-thisdir=`dirname "$0"`
-thisdir=`cd "$thisdir" && pwd`
-
-export LD_LIBRARY_PATH=/usr/local/lib:/usr/local/redhawk/core/lib64
-export PATH=$PATH:/usr/local/redhawk/core/bin
-export SDRROOT="$thisdir"/sdr
-export LOGDIR="$SDRROOT"/dom/logs
-export RHDOMAIN=REDHAWK_DEV
+RHDOMAIN=REDHAWK_DEV
 
 DIGITIZER_NODE=/nodes/RTL2832_Node/DeviceManager.dcd.xml
+
+GPP_NODE_NAME=RTL-Demo-GPP-Node
+GPP_NODE=/nodes/${GPP_NODE_NAME}/DeviceManager.dcd.xml
+
 FEIDEVICE=RTL2832U
 startmsg='with RTL frontend node'
 QUOTES=\'\"
@@ -22,6 +17,7 @@ usage() {
 Usage: $0 [-sh]
  
    -d DOMAIN
+   -r SDRROOT
    -h Show help
    -s Run with the RTL simulator
 EOFEOF
@@ -34,7 +30,7 @@ err() {
 
 killif() {
    for pid in "$@" ; do
-      [ -e /proc/$pid ] && /usr/bin/kill -1 "$pid" 
+      [ -e /proc/$pid ] && /usr/bin/kill -TERM -$$ "$pid"
    done
 }
 
@@ -44,19 +40,29 @@ while getopts "hsd:" opt ; do
            FEIDEVICE=sim_RX_DIGITIZER
            startmsg='with RTL simulator node' ;;
         d) RHDOMAIN="$OPTARG" ;;
+        r) SDRROOT="$OPTARG" ;;
         h) usage; exit 0 ;;
         *) err "BAD PARAMETER $opt" ;;
     esac
 done
+
+if [ -z "$OSSIEHOME" ]; then
+  source /etc/profile.d/redhawk.sh
+fi
+if [ -z "$SDRROOT" ]; then
+  source /etc/profile.d/redhawk-sdrroot.sh
+fi
+
+export LOGDIR="$SDRROOT"/dom/logs
+mkdir -p ${LOGDIR}
 
 pids=
 
 # kill all remaining subprocesses at exit
 trap 'killif $pids' 0 1 2 15
 
-mkdir -p "$LOGDIR" || err
-if [ ! -e $SDRROOT/dom/waveforms/RTL_FM_Waveform ] ; then
-    "$thisdir"/mksdr.sh || err
+if [ ! -f "$SDRROOT/dev/$GPP_NODE" ]; then
+  ${SDRROOT}/dev/devices/GPP/python/nodeconfig.py --domainname=${RHDOMAIN} --nodename=${GPP_NODE_NAME} --inplace
 fi
 
 # FIXME:  Should be waveform init properties from the rtl app
@@ -73,7 +79,7 @@ nodeBooter $NBARGS -D /domain/DomainManager.dmd.xml --domainname $RHDOMAIN > "$L
 pids=$!
 
 # GPP
-nodeBooter $NBARGS -d /nodes/RTL-GPP-Node/DeviceManager.dcd.xml --domainname $RHDOMAIN > "$LOGDIR"/gpp.log 2>&1 || err &
+nodeBooter $NBARGS -d "${GPP_NODE}" --domainname $RHDOMAIN > "$LOGDIR"/gpp.log 2>&1 || err &
 pids="$pids $!"
 
 # Digitizer
