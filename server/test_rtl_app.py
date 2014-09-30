@@ -9,17 +9,11 @@ import logging
 import os
 from subprocess import Popen, PIPE
 
-def _count_redhawk_processes():
-	uid = os.getuid()
-	p = Popen("/bin/ps -ef -u %s | grep -v grep | grep -v java | egrep '(IOR|DomainManager|DeviceManager)' | wc -l" % uid, 
-		       shell=True, stdout=PIPE)
-	return int(p.communicate()[0])
-
 class RTLAppTest(unittest.TestCase):
 
 	def setUp(self):
 		# clear the running waveform before tests
-		self.rtl_app = rtl_app.RTLApp("REDHAWK_DEV_%s" % id(self), domainprogargs=['-s'])
+		self.rtl_app = rtl_app.RTLApp("REDHAWK_DEV")
 		self.rtl_app.stop_survey()
 
 	def tearDown(self):
@@ -27,27 +21,18 @@ class RTLAppTest(unittest.TestCase):
 		self.rtl_app.stop_survey()
 
 	def test_halt(self, rtl=None):
-		cnt = _count_redhawk_processes()
-		if cnt > 0:
-			self.fail("Cannot run other redhawk processes as this user while testing.  Found %s processes" % cnt)
 		rtl = self.rtl_app
 
 		for x in xrange(8):		
 			a = rtl.set_survey(frequency=101100000, demod='fm')
 			self.assertEquals(101100000, a['frequency'])
 			self.assertEquals('fm', a['demod'])
-			cnt = _count_redhawk_processes()
-			if cnt == 0:
-				self.fail("Interation %s: No running redhawk processes" % x)
 
 			a = rtl.stop_survey()
 			self.assertEquals(None, a['frequency'])
 			self.assertEquals(None, a['demod'])
 			print "SLEEPING"
 			time.sleep(.5)
-			cnt = _count_redhawk_processes()
-	        if cnt > 0:
-		        self.fail("Iteration %s: Still running Redhawk subprocesses.  Found %s" % (x, cnt))
 
 
 

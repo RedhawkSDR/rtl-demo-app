@@ -14,8 +14,9 @@ from ossie.cf import StandardEvent, ExtendedEvent, CF
 
 from rest.asyncport import AsyncPort
 
-from _common import BadDemodException, BadFrequencyException
+from _common import BadDemodException, BadFrequencyException, DeviceUnavailableException
 from _utils.tasking import background_task, safe_return_future
+from rtldevice import RTL2832U
 
 def _delay(func):
 
@@ -40,6 +41,8 @@ class RTLApp(object):
         '''
         self._domainname = domainname
         self._waveform_name = "rtl_waveform_%s" % id(self)
+
+        self._device_available = False
 
         # initialize event listener dict
         self._listeners = {
@@ -143,11 +146,30 @@ class RTLApp(object):
             }
 
         '''
-        # TODO: Stub
-        if True:
+        self._init_device()
+        if self._device_available:
             return dict(type='rtl', status='ready')
         else:
             return dict(type='rtl', status='unavailable')
+
+
+    def _init_device(self):
+        '''
+            fetch the RTL device and check hardware availability.
+        '''
+        rtl = RTL2832U.locate(self._get_domain())
+        avail = rtl.get_available_rtl()
+
+        # if the availability has changed ...
+        if self._device_available != bool(avail):
+            if avail:
+                # set the target RTL device (so it is available to be allocated)
+                rtl.set_target_rtl(avail[0])
+            else:
+                # FIXME: device is now gone - what action to take
+                pass
+        self._device_available = bool(avail) 
+        return self._device_available
 
     @_delay
     def get_processing_list(self):
@@ -274,6 +296,12 @@ class RTLApp(object):
     def _launch_waveform(self):
         if self._waveform:
             return
+
+        # update device status
+        self._init_device()
+
+        if not self._device_available:
+            raise DeviceUnavailableException('No RTL device available on the system')
 
         try:        
             logging.info("About to create Rtl_FM_Waveform")

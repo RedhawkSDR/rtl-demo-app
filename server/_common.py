@@ -9,3 +9,5 @@ class BadFrequencyException(Exception):
     def __init__(self, frequency):
         Exception.__init__(self, "Bad frequency %s" % frequency)
         self.frequency = frequency
+
+class DeviceUnavailableException(Exception): pass
