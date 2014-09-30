@@ -34,13 +34,15 @@ killif() {
    done
 }
 
-while getopts "hsd:" opt ; do
+while getopts "hsd:r:" opt ; do
     case "$opt" in 
         s) DIGITIZER_NODE=/nodes/sim_RX_DIGITIZER_Node/DeviceManager.dcd.xml
            FEIDEVICE=sim_RX_DIGITIZER
            startmsg='with RTL simulator node' ;;
         d) RHDOMAIN="$OPTARG" ;;
-        r) SDRROOT="$OPTARG" ;;
+        r) export SDRROOT="$OPTARG"
+           # make absolute
+           export SDRROOT=`cd "$SDRROOT" && pwd` ;;
         h) usage; exit 0 ;;
         *) err "BAD PARAMETER $opt" ;;
     esac
