@@ -23,7 +23,7 @@ import threading
 
 # application imports
 from rtl_app import AsyncRTLApp
-from _common import BadDemodException, BadFrequencyException
+from _common import BadDemodException, BadFrequencyException, DeviceUnavailableException
 
 # setup command line options
 from tornado.options import define, options
@@ -103,7 +103,11 @@ class SurveyHandler(_RTLAppHandler):
             self.write(dict(success=False,
                             error="'%s' is not a valid processor" % data['processing'],
                             request=data))
-
+        except DeviceUnavailableException:
+            self.set_status(400)
+            self.write(dict(success=False,
+                            error="RTL device is not available",
+                            request=data))
         except Exception:
             logging.exception("Error setting survey")
             self.set_status(500)
