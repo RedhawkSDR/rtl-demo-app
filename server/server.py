@@ -247,7 +247,7 @@ def get_application(rtl_app, _ioloop=None):
     (r"/device", DeviceHandler, dict(rtl_app=rtl_app, ioloop=_ioloop)),
 #    (r"/output/audio", AudioWebSocketHandler, dict(rtl_app=rtl_app, ioloop=_ioloop)),
     # (r"/status", StatusHandler, dict(rtl_app=rtl_app, ioloop=_ioloop))
-    (r"/status", EventHandler, dict(rtl_app=rtl_app, ioloop=_ioloop)),
+    (r"/status", EventHandler, dict(rtl_app=rtl_app, _ioloop=_ioloop)),
     (r"/output/psd/narrowband", PSDHandler,
      dict(rtl_app=rtl_app, port_type=rtl_app.PORT_TYPE_NARROWBAND, _ioloop=_ioloop)),
     (r"/output/psd/wideband", PSDHandler,
