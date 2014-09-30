@@ -41,18 +41,6 @@ class RTLApp(object):
         self._domainname = domainname
         self._waveform_name = "rtl_waveform_%s" % id(self)
 
-        # initialize programs
-        bindir = "%s/../bin" % os.path.abspath(os.path.dirname(__import__(__name__).__file__))
-        logging.info("BINDIR %s", bindir)
-        if not rtlstatprog:
-            rtlstatprog = os.path.join(os.path.abspath(bindir), 'rtlstat.sh')
-        self._rtlstat = rtlstatprog
-
-        if not domainprog:
-            domainprog = os.path.join(os.path.abspath(bindir), 'startdomain.sh')
-        self._domainprog = domainprog
-        self._domainprogargs = domainprogargs
-
         # initialize event listener dict
         self._listeners = {
            'event': [],
@@ -130,7 +118,7 @@ class RTLApp(object):
     @_delay
     def stop_survey(self):
         self._stop_waveform()
-        self._stop_domain()
+        self._clear_redhawk()
 
         survey = dict(frequency=None, demod=None)
         self._post_event('survey', survey)
@@ -155,16 +143,11 @@ class RTLApp(object):
             }
 
         '''
-        # FIXME: Make in future
-        try:
-            p = Popen(self._rtlstat, shell=False)
-            p.wait()
-        except Exception, e:
-            raise StandardError("%s: Failed to get device status %s" %  (self._rtlstat, str(e)))
-        if p.returncode:
-            return dict(type='rtl', status='unavailable')
-        else:
+        # TODO: Stub
+        if True:
             return dict(type='rtl', status='ready')
+        else:
+            return dict(type='rtl', status='unavailable')
 
     @_delay
     def get_processing_list(self):
@@ -287,26 +270,6 @@ class RTLApp(object):
         #self._domain._odmListener = None
         # self._odmListener = ODMListener()
         # self._odmListener.connect(self._domain)
-
-    def _start_domain(self):
-        if not self._process or self._process.poll() is not None:
-            logging.debug("Start domain %s", self._domainname)
-            try:
-                self._process = Popen(itertools.chain((self._domainprog, '-d', self._domainname), self._domainprogargs),
-                                      shell=False)
-            except OSError, e:
-                logging.exception("Error starting domain with command %s", self._domainprog)
-                raise
-
-            # FIXME: Determine if domain is running other than sleeping
-            logging.debug("Started domain %s pid=%d", self._domainname, self._process.pid)
-            time.sleep(1)
-            logging.debug("Sleep done")
-
-    def _stop_domain(self):
-        self._stop_waveform()
-        self._clear_redhawk()
-
 
     def _launch_waveform(self):
         if self._waveform:
