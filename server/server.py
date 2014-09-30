@@ -52,6 +52,7 @@ class _RTLAppHandler(web.RequestHandler):
         # explicit ioloop for unit testing
         self.ioloop = ioloop
 
+
 class SurveyHandler(_RTLAppHandler):
 
     @gen.coroutine
@@ -149,14 +150,6 @@ class DeviceHandler(_RTLAppHandler):
         logging.info("Survey DELETE End")
 
 
-class StatusHandler(_RTLAppHandler): 
-    def get(self):
-        self.write({
-          "url": "/survey",
-          "data": {
-          }
-        })
-
 class EventHandler(websocket.WebSocketHandler):
 
     def initialize(self, rtl_app, _ioloop=None):
@@ -240,25 +233,22 @@ class PSDHandler(websocket.WebSocketHandler):
         except websocket.WebSocketClosedError:
             logging.debug('Received WebSocketClosedError. Ignoring')
 
+
 def get_application(rtl_app, _ioloop=None):
     application = tornado.web.Application([
-    (r"/static/(.*)", tornado.web.StaticFileHandler, {"path": staticdir}),
+        (r"/static/(.*)", tornado.web.StaticFileHandler, {"path": staticdir}),
 
-    (r"/survey", SurveyHandler, dict(rtl_app=rtl_app, ioloop=_ioloop)),
-    (r"/device", DeviceHandler, dict(rtl_app=rtl_app, ioloop=_ioloop)),
-#    (r"/output/audio", AudioWebSocketHandler, dict(rtl_app=rtl_app, ioloop=_ioloop)),
-    # (r"/status", StatusHandler, dict(rtl_app=rtl_app, ioloop=_ioloop))
-    (r"/status", EventHandler, dict(rtl_app=rtl_app, _ioloop=_ioloop)),
-    (r"/output/psd/narrowband", PSDHandler,
-     dict(rtl_app=rtl_app, port_type=rtl_app.PORT_TYPE_NARROWBAND, _ioloop=_ioloop)),
-    (r"/output/psd/wideband", PSDHandler,
-     dict(rtl_app=rtl_app, port_type=rtl_app.PORT_TYPE_WIDEBAND, _ioloop=_ioloop))
-], debug=options.debug)
+        (r"/survey", SurveyHandler, dict(rtl_app=rtl_app, ioloop=_ioloop)),
+        (r"/device", DeviceHandler, dict(rtl_app=rtl_app, ioloop=_ioloop)),
+        #(r"/output/audio", AudioWebSocketHandler, dict(rtl_app=rtl_app, ioloop=_ioloop)),
+        (r"/status", EventHandler, dict(rtl_app=rtl_app, _ioloop=_ioloop)),
+        (r"/output/psd/narrowband", PSDHandler,
+         dict(rtl_app=rtl_app, port_type=rtl_app.PORT_TYPE_NARROWBAND, _ioloop=_ioloop)),
+        (r"/output/psd/wideband", PSDHandler,
+         dict(rtl_app=rtl_app, port_type=rtl_app.PORT_TYPE_WIDEBAND, _ioloop=_ioloop))
+    ], debug=options.debug)
 
     return application
-
-
-
 
 
 if __name__ == '__main__':

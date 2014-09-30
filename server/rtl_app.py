@@ -150,10 +150,10 @@ class RTLApp(object):
             if avail:
                 # set the target RTL device (so it is available to be allocated)
                 rtl.set_target_hardware(avail[0])
-		self._device = dict(type='rtl', status='ready')
+                self._device = dict(type='rtl', status='ready')
             else:
                 # FIXME: device is now gone - what action to take
-		self._device = dict(type='rtl', status='unavailable')
+                self._device = dict(type='rtl', status='unavailable')
                 self._stop_waveform()
 
             self._device_available = bool(avail) 
