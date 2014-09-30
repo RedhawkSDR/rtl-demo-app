@@ -166,6 +166,7 @@ class RTLApp(object):
             else:
                 # FIXME: device is now gone - what action to take
 		self._device = dict(type='rtl', status='unavailable')
+                self._stop_waveform()
 
             self._device_available = bool(avail) 
             self._post_event('device', self._device)
