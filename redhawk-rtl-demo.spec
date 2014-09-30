@@ -43,7 +43,7 @@ Requires:       redhawk >= 1.10
 Requires:       redhawk-devel
 Requires:       redhawk-web
 Requires:       rhweb-python-tornado
-Requires:       rhweb-python-gevent
+Requires:       python-futures
 BuildRequires:  npm
 BuildRequires:  git
 
