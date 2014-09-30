@@ -284,4 +284,6 @@ if __name__ == '__main__':
                         rtlstatprog=options.rtlstat)
     application = get_application(rtlapp)
     application.listen(options.port)
+
+    tornado.ioloop.PeriodicCallback(rtlapp.poll_device_status, 2000).start()
     ioloop.IOLoop.instance().start()

@@ -146,14 +146,11 @@ class RTLApp(object):
             }
 
         '''
-        self._init_device()
-        if self._device_available:
-            return dict(type='rtl', status='ready')
-        else:
-            return dict(type='rtl', status='unavailable')
+        self.poll_device_status()
+        return self._device
 
 
-    def _init_device(self):
+    def poll_device_status(self):
         '''
             fetch the RTL device and check hardware availability.
         '''
@@ -165,10 +162,14 @@ class RTLApp(object):
             if avail:
                 # set the target RTL device (so it is available to be allocated)
                 rtl.set_target_rtl(avail[0])
+		self._device = dict(type='rtl', status='ready')
             else:
                 # FIXME: device is now gone - what action to take
-                pass
-        self._device_available = bool(avail) 
+		self._device = dict(type='rtl', status='unavailable')
+
+            self._device_available = bool(avail) 
+            self._post_event('device', self._device)
+
         return self._device_available
 
     @_delay
@@ -298,7 +299,7 @@ class RTLApp(object):
             return
 
         # update device status
-        self._init_device()
+        self.poll_device_status()
 
         if not self._device_available:
             raise DeviceUnavailableException('No RTL device available on the system')
@@ -363,3 +364,4 @@ class AsyncRTLApp(RTLApp):
     set_survey = background_task(RTLApp.set_survey)
     stop_survey = background_task(RTLApp.stop_survey)
     get_device = background_task(RTLApp.get_device)
+    poll_device_status = background_task(RTLApp.poll_device_status)
