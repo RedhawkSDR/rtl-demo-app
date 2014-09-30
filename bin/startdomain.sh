@@ -34,6 +34,15 @@ killif() {
    done
 }
 
+anywait(){
+   while true ; do
+       for pid in "$@" ; do
+           [[ ! -e /proc/$pid ]] && return
+       done
+       sleep .5
+   done
+}
+
 while getopts "hsd:r:" opt ; do
     case "$opt" in 
         s) DIGITIZER_NODE=/nodes/sim_RX_DIGITIZER_Node/DeviceManager.dcd.xml
@@ -91,4 +100,4 @@ pids="$pids $!"
 echo "Started $RHDOMAIN domain $startmsg. Use Ctrl-C to halt"
 
 # block until all subprocesses are killed. 
-wait $pids
+anywait $pids
