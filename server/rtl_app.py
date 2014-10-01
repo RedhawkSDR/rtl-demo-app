@@ -16,15 +16,7 @@ from rest.asyncport import AsyncPort
 
 from _common import BadDemodException, BadFrequencyException, DeviceUnavailableException
 from _utils.tasking import background_task, safe_return_future
-from rtldevice import RTL2832U
-
-def _delay(func):
-
-    @wraps(func)
-    def do_delay(self, *args, **kwargs):
-        self._delayfunc(func)
-        return func(self, *args, **kwargs)
-    return do_delay
+from devices import sim_RX_DIGITIZER
 
 
 class RTLApp(object):
@@ -35,13 +27,14 @@ class RTLApp(object):
     PORT_TYPE_WIDEBAND = 'wideband%s'
     PORT_TYPE_NARROWBAND = 'narrowband%s'
 
-    def __init__(self, domainname, delayfunc=lambda meth: None, rtlstatprog=None, domainprog=None, domainprogargs=[]):
+    def __init__(self, domainname, frontend=sim_RX_DIGITIZER):
         '''
-              delayfunc - a function  delay function is invoked during a call.
+              Instantiate the RTL Application against the given redhawk domain.
         '''
         self._domainname = domainname
-        self._waveform_name = "rtl_waveform_%s" % id(self)
+        self._frontend = frontend
 
+        self._waveform_name = "rtl_waveform_%s" % id(self)
         self._device_available = False
 
         # initialize event listener dict
@@ -65,7 +58,6 @@ class RTLApp(object):
         self._survey = dict(frequency=None, demod=None)
         self._device = dict(type='rtl', status='unavailable')
 
-        self._delayfunc = delayfunc
 
     def _clear_redhawk(self):
         # clear the REDHAWK cache
@@ -76,7 +68,6 @@ class RTLApp(object):
         self._psd1_port = None
         self._psd2_port = None
 
-    @_delay
     def get_survey(self):
         '''
             Return the survey properties.  A dictionary of the frequency and demodulator
@@ -94,7 +85,6 @@ class RTLApp(object):
     def get_available_processing(self):
         return self.SURVEY_DEMOD_LIST
 
-    @_delay
     def set_survey(self, frequency, demod, timeout=2):
         '''
              Sets the survey properties.  Returns the new processing values.
@@ -118,7 +108,6 @@ class RTLApp(object):
         self._post_event('survey', survey)
         return survey
 
-    @_delay
     def stop_survey(self):
         self._stop_waveform()
         self._clear_redhawk()
@@ -128,7 +117,6 @@ class RTLApp(object):
         return survey
 
 
-    @_delay
     def get_device(self):
         '''
             Gets current device settings as a dictionary.
@@ -154,14 +142,14 @@ class RTLApp(object):
         '''
             fetch the RTL device and check hardware availability.
         '''
-        rtl = RTL2832U.locate(self._get_domain())
-        avail = rtl.get_available_rtl()
+        rtl = self._frontend.locate(self._get_domain())
+        avail = rtl.get_available_hardware()
 
         # if the availability has changed ...
         if self._device_available != bool(avail):
             if avail:
                 # set the target RTL device (so it is available to be allocated)
-                rtl.set_target_rtl(avail[0])
+                rtl.set_target_hardware(avail[0])
 		self._device = dict(type='rtl', status='ready')
             else:
                 # FIXME: device is now gone - what action to take
@@ -173,7 +161,6 @@ class RTLApp(object):
 
         return self._device_available
 
-    @_delay
     def get_processing_list(self):
         '''
             Gets all available processing types.

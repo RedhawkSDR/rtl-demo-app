@@ -24,6 +24,7 @@ import threading
 # application imports
 from rtl_app import AsyncRTLApp
 from _common import BadDemodException, BadFrequencyException, DeviceUnavailableException
+from devices import RTL2832U, sim_RX_DIGITIZER
 
 # setup command line options
 from tornado.options import define, options
@@ -270,18 +271,16 @@ if __name__ == '__main__':
     tornado.options.parse_command_line()
 
     domain_args = []
+    device = RTL2832U
     if options.simulate:
-        domain_args.append('-s')
+        device = sim_RX_DIGITIZER
 
     if options.mock:
         from mock_rtl_app import AsyncRTLApp
         rtlapp = AsyncRTLApp(options.domain, 
                                     delayfunc=lambda f: time.sleep(options.delay))
     else:
-        rtlapp = AsyncRTLApp(options.domain,
-                        domainprogargs=domain_args,
-                        delayfunc=lambda f: time.sleep(options.delay),
-                        rtlstatprog=options.rtlstat)
+        rtlapp = AsyncRTLApp(options.domain, device)
     application = get_application(rtlapp)
     application.listen(options.port)
 

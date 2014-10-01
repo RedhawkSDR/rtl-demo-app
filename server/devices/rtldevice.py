@@ -27,9 +27,9 @@ class RTL2832U(object):
             RTL_ID == dev._get_identifier()
             return RTL2832U(dev)
         
-        raise DeviceNotFoundError()
+        raise DeviceNotFoundError('RTL2932U')
     
-    def get_available_rtl(self):
+    def get_available_hardware(self):
         '''
             Returns a list of the available RTL devices
             >> x.get_vailable_rtl()
@@ -47,10 +47,8 @@ class RTL2832U(object):
         self.device.configure(props_from_dict(dict(update_available_devices=True)))
         q = props_to_dict(self.device.query(props_from_dict(dict(available_devices=None))))
         return [ fixd(d) for d in q['available_devices']]
-        #return q['available_devices']
-        return nq
 
-    def set_target_rtl(self, rtlx):
+    def set_target_hardware(self, rtlx):
         '''
             Sets the target RTL to use.  To choose a target device
             use a dictionary with the criteria to select (from the available

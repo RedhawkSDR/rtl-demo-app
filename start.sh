@@ -12,4 +12,4 @@ fi
 
 source /etc/profile.d/redhawk.sh
 
-exec ${pyvenv} python ${SCRIPTPATH}/server/server.py $@
+exec ${pyvenv} python ${SCRIPTPATH}/server/server.py "$@"
