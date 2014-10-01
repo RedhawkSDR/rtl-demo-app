@@ -190,7 +190,15 @@ class RTLApp(object):
         self._listeners[portname%'data'].append(data_listener)
         if sri_listener:
             self._listeners[portname%'sri'].append(sri_listener)
-
+           
+            # push out initial SRI packet            
+            if portname == self.PORT_TYPE_WIDEBAND:                
+                if self._psd1_port:
+                    self._push_sri_psd1(self._psd1_port.last_sri)
+            else:
+                if self._psd2_port:
+                    self._push_sri_psd2(self._psd2_port.last_sri)
+                
     def rm_stream_listener(self, portname, data_listener, sri_listener=None):
         '''
              Adds a listener for streaming (SRI and Data).
