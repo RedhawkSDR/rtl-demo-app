@@ -1,4 +1,9 @@
 #!/bin/sh -e
+#
+# This script will create a local SDR root, start a REDHAWK_SIM domain
+# with the simulator device, and run the rtl_demo
+# app against this domain.
+
 thisdir=`dirname "$0"`
 thisdir=`cd "$thisdir" && /bin/pwd`
 
