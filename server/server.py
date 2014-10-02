@@ -246,6 +246,8 @@ def get_application(rtl_app, _ioloop=None):
          dict(rtl_app=rtl_app, port_type=rtl_app.PORT_TYPE_NARROWBAND, _ioloop=_ioloop)),
         (r"/output/psd/wideband", PSDHandler,
          dict(rtl_app=rtl_app, port_type=rtl_app.PORT_TYPE_WIDEBAND, _ioloop=_ioloop))
+        (r"/output/psd/fm", PSDHandler,
+         dict(rtl_app=rtl_app, port_type=rtl_app.PORT_TYPE_FM, _ioloop=_ioloop))
     ], debug=options.debug)
 
     return application

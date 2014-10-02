@@ -24,8 +24,10 @@ class RTLApp(object):
     SURVEY_DEMOD_LIST = [ "fm" ]
     FREQUENCY_RANGE = [1000000, 900000000]
     RTL_FM_WAVEFORM_ID = 'DCE:1ed946d9-3e77-4acc-8c2c-912641da6545'
+
     PORT_TYPE_WIDEBAND = 'wideband%s'
     PORT_TYPE_NARROWBAND = 'narrowband%s'
+    PORT_TYPE_FM = 'fm%s'
 
     def __init__(self, domainname, frontend=sim_RX_DIGITIZER):
         '''
@@ -43,14 +45,18 @@ class RTLApp(object):
            RTLApp.PORT_TYPE_WIDEBAND%'data': [],
            RTLApp.PORT_TYPE_WIDEBAND%'sri': [],
            RTLApp.PORT_TYPE_NARROWBAND%'data': [],
-           RTLApp.PORT_TYPE_NARROWBAND%'sri': []
+           RTLApp.PORT_TYPE_NARROWBAND%'sri': [],
+           RTLApp.PORT_TYPE_FM%'data': [],
+           RTLApp.PORT_TYPE_FM%'sri': []
         }
 
         # create streaming callbacks (bridge between BULKIO callback and stream callback)
-        self._push_sri_psd1 = self._generate_bulkio_callback(self.PORT_TYPE_WIDEBAND, 'sri')
-        self._push_packet_psd1 = self._generate_bulkio_callback(self.PORT_TYPE_WIDEBAND, 'data')
-        self._push_sri_psd2 = self._generate_bulkio_callback(self.PORT_TYPE_NARROWBAND, 'sri')
-        self._push_packet_psd2 = self._generate_bulkio_callback(self.PORT_TYPE_NARROWBAND, 'data')
+        self._push_sri_wb_psd = self._generate_bulkio_callback(self.PORT_TYPE_WIDEBAND, 'sri')
+        self._push_packet_wb_psd = self._generate_bulkio_callback(self.PORT_TYPE_WIDEBAND, 'data')
+        self._push_sri_nb_psd = self._generate_bulkio_callback(self.PORT_TYPE_NARROWBAND, 'sri')
+        self._push_packet_nb_psd = self._generate_bulkio_callback(self.PORT_TYPE_NARROWBAND, 'data')
+        self._push_sri_fm_psd = self._generate_bulkio_callback(self.PORT_TYPE_FM, 'sri')
+        self._push_packet_fm_psd = self._generate_bulkio_callback(self.PORT_TYPE_FM, 'data')
 
         self._clear_redhawk()
 
@@ -65,8 +71,9 @@ class RTLApp(object):
         self._components = {}
         self._process = None
         self._waveform = None
-        self._psd1_port = None
-        self._psd2_port = None
+        self._wb_psd_port = None
+        self._nb_psd_port = None
+        self._fm_psd_port = None
 
     def get_survey(self):
         '''
@@ -193,11 +200,11 @@ class RTLApp(object):
            
             # push out initial SRI packet            
             if portname == self.PORT_TYPE_WIDEBAND:                
-                if self._psd1_port:
-                    self._push_sri_psd1(self._psd1_port.last_sri)
+                if self._wb_psd_port:
+                    self._push_sri_wb_psd(self._wb_psd_port.last_sri)
             else:
-                if self._psd2_port:
-                    self._push_sri_psd2(self._psd2_port.last_sri)
+                if self._nb_psd_port:
+                    self._push_sri_nb_psd(self._nb_psd_port.last_sri)
                 
     def rm_stream_listener(self, portname, data_listener, sri_listener=None):
         '''
@@ -257,15 +264,20 @@ class RTLApp(object):
         return self._get_component('RTL_FM_Controller_1')
         
     def  _init_psd_listeners(self):
-        if not self._psd1_port:
-            port = self._get_component('psd_1').getPort('psd_dataFloat_out')
-            self._psd1_port = AsyncPort(AsyncPort.PORT_TYPE_FLOAT, self._push_sri_psd1, self._push_packet_psd1)
-            port.connectPort(self._psd1_port.getPort(), "psd1_%s" % id(self))
+        if not self._wb_psd_port:
+            port = self._get_component('wideband_psd').getPort('psd_dataFloat_out')
+            self._wb_psd_port = AsyncPort(AsyncPort.PORT_TYPE_FLOAT, self._push_sri_wb_psd, self._push_packet_wb_psd)
+            port.connectPort(self._wb_psd_port.getPort(), "wb_psd_%s" % id(self))
 
-        if not self._psd2_port:    
-            port = self._get_component('psd_2').getPort('psd_dataFloat_out')
-            self._psd2_port = AsyncPort(AsyncPort.PORT_TYPE_FLOAT, self._push_sri_psd2, self._push_packet_psd2)
-            port.connectPort(self._psd2_port.getPort(), "psd2_%s" % id(self))
+        if not self._nb_psd_port:    
+            port = self._get_component('narrowband_psd').getPort('psd_dataFloat_out')
+            self._nb_psd_port = AsyncPort(AsyncPort.PORT_TYPE_FLOAT, self._push_sri_nb_psd, self._push_packet_nb_psd)
+            port.connectPort(self._nb_psd_port.getPort(), "nb_psd_%s" % id(self))
+
+        if not self._fm_psd_port:    
+            port = self._get_component('fm_psd').getPort('psd_dataFloat_out')
+            self._fm_psd_port = AsyncPort(AsyncPort.PORT_TYPE_FLOAT, self._push_sri_fm_psd, self._push_packet_fm_psd)
+            port.connectPort(self._fm_psd_port.getPort(), "fm_psd_%s" % id(self))
 
     def _generate_bulkio_callback(self, portname, data_type):
         '''
