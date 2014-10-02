@@ -99,6 +99,7 @@ rm -rf %{buildroot}
 %{_rtl_client}/lib
 %{_rtl_client}/images
 %{_rtl_client}/fonts
+%{_rtl_client}/css
 
 %defattr(-,root,root,-)
 %{_nginx}/rtl-demo.enabled
