@@ -202,9 +202,12 @@ class RTLApp(object):
             if portname == self.PORT_TYPE_WIDEBAND:                
                 if self._wb_psd_port:
                     self._push_sri_wb_psd(self._wb_psd_port.last_sri)
-            else:
+            elif portname == self.PORT_TYPE_NARROWBAND:
                 if self._nb_psd_port:
                     self._push_sri_nb_psd(self._nb_psd_port.last_sri)
+            elif portname == self.PORT_TYPE_FM:
+                if self._fm_psd_port:
+                    self._push_sri_fm_psd(self._fm_psd_port.last_sri)
                 
     def rm_stream_listener(self, portname, data_listener, sri_listener=None):
         '''

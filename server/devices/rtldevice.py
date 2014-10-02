@@ -24,8 +24,8 @@ class RTL2832U(object):
             domainptr = domain
             
         for dev in domainptr.devices:
-            RTL_ID == dev._get_identifier()
-            return RTL2832U(dev)
+            if RTL_ID == dev._get_identifier():
+                return RTL2832U(dev)
         
         raise DeviceNotFoundError('RTL2932U')
     
@@ -72,8 +72,8 @@ class RTL2832U(object):
         return props_to_dict(self.device.query(props_from_dict(dict(target_device=None))))
 
 if __name__ == '__main__':
-    avail = RTL2832U.locate('REDHAWK_DEV').get_available_rtl()
+    avail = RTL2832U.locate('REDHAWK_DEV').get_available_hardware()
     print "RTL Device is %s" % (avail and 'Available' or 'Unavailable')
     if avail:
         pprint.pprint(avail)
-        RTL2832U.locate('REDHAWK_DEV').set_target_rtl(avail[0])
+        RTL2832U.locate('REDHAWK_DEV').set_target_hardware(avail[0])

@@ -7,7 +7,7 @@ from ossie.utils import redhawk
 from ossie.cf import StandardEvent, ExtendedEvent, CF
 from ossie.properties import props_from_dict, props_to_dict
 
-SIM_ID = 'DCE:6e71da01-9e7f-4b8a-838c-8f1d59d6dd9c'
+SIM_ID = 'sim_RX_DIGITIZER_Node:sim_RX_DIGITIZER_1'
 
 class DeviceNotFoundError(StandardError): pass
 
@@ -24,8 +24,8 @@ class sim_RX_DIGITIZER(object):
             domainptr = domain
             
         for dev in domainptr.devices:
-            SIM_ID == dev._get_identifier()
-            return sim_RX_DIGITIZER(dev)
+            if SIM_ID == dev._get_identifier():
+                return sim_RX_DIGITIZER(dev)
         
         raise DeviceNotFoundError('sim_RX_DIGITIZER')
     
@@ -57,8 +57,8 @@ class sim_RX_DIGITIZER(object):
         pass
 
 if __name__ == '__main__':
-    avail = sim_RX_DIGITIZER.locate('REDHAWK_DEV').get_available_hardware()
-    print "RTL Device is %s" % (avail and 'Available' or 'Unavailable')
+    avail = sim_RX_DIGITIZER.locate('REDHAWK_SIM').get_available_hardware()
+    print "SIM Device is %s" % (avail and 'Available' or 'Unavailable')
     if avail:
         pprint.pprint(avail)
-        sim_RX_DIGITIZER.locate('REDHAWK_DEV').set_target_hardware(avail[0])
+        sim_RX_DIGITIZER.locate('REDHAWK_SIM').set_target_hardware(avail[0])
