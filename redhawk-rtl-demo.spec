@@ -34,7 +34,7 @@ Version:	1.0.0
 Release:	1%{?dist}
 Summary:	A sample REDHAWK web application that uses an RTL device.
 
-License:	GPL
+License:	LGPL
 BuildRoot:	%(mktemp -ud %{_tmppath}/%{name}-%{version}-%{release}-XXXXXX)
 Source0:        %{name}-%{version}.tar.gz
 
