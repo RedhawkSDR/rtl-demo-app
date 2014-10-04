@@ -17,3 +17,7 @@
 # You should have received a copy of the GNU Lesser General Public License
 # along with this program.  If not, see http://www.gnu.org/licenses/.
 #
+from device_handler import DeviceHandler
+from event_handler import EventHandler
+from psd_handler import PSDHandler
+from survey_handler import SurveyHandler

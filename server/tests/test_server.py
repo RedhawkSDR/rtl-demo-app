@@ -37,8 +37,7 @@ from tornado import websocket
 
 # application imports
 import server
-import rtl_app
-import mock_rtl_app
+from rtl_app import MockAsyncRTLApp
 import wsclient
 
 # all method returning suite is required by tornado.testing.main()
@@ -60,7 +59,7 @@ class RESTfulTest(AsyncHTTPTestCase, LogTrapTestCase):
 
     def get_app(self):
         # create a concurrent version of the applicaiton
-        concurrent_rtl_class = mock_rtl_app.AsyncRTLApp
+        concurrent_rtl_class = MockAsyncRTLApp
         #concurrent_rtl_class = rtl_app.AsyncRTLApp
 
         # application renewed each test case

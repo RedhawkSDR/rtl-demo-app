@@ -41,6 +41,7 @@ class RTLApp(object):
     FREQUENCY_RANGE = [1000000, 900000000]
     PORT_TYPE_WIDEBAND = 'wideband%s'
     PORT_TYPE_NARROWBAND = 'narrowband%s'
+    PORT_TYPE_FM = 'fm%s'
 
 
     def __init__(self, domainname, delayfunc=lambda meth: None):

@@ -39,7 +39,7 @@ class RTLAppTest(unittest.TestCase):
         # clear the running waveform before tests
         self.rtl_app.stop_survey()
 
-    def _test_halt(self, rtl=None):
+    def test_halt(self, rtl=None):
         rtl = self.rtl_app
 
         for x in xrange(8):     
@@ -56,7 +56,7 @@ class RTLAppTest(unittest.TestCase):
 
 
 
-    def _test_survey(self):      
+    def test_survey(self):
         rtl = self.rtl_app
 
 

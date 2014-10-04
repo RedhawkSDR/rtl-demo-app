@@ -17,24 +17,15 @@
 # You should have received a copy of the GNU Lesser General Public License
 # along with this program.  If not, see http://www.gnu.org/licenses/.
 #
-#from ossie.utils import redhawk
-#from ossie.utils.redhawk.channels import ODMListener
-import collections
 import threading
 import time
 import logging
-import pprint
-import os
-import itertools
-from subprocess import Popen
-from functools import wraps
+
 from ossie.utils import redhawk
-from ossie.cf import StandardEvent, ExtendedEvent, CF
 
-from rest.asyncport import AsyncPort
-
+from asyncport import AsyncPort
 from _common import BadDemodException, BadFrequencyException, DeviceUnavailableException
-from _utils.tasking import background_task, safe_return_future
+from _utils.tasking import background_task
 from devices import sim_RX_DIGITIZER
 
 SRI_MODE_TO_ATOMS = {
