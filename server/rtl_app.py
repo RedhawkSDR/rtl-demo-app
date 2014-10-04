@@ -190,7 +190,7 @@ class RTLApp(object):
 
     def _clear_redhawk(self):
         # clear the REDHAWK cache
-        self._close_psd_listeners()
+        #self._close_psd_listeners()
         self._domain = None
         self._components = {}
         self._process = None
@@ -237,7 +237,7 @@ class RTLApp(object):
         return survey
 
     def stop_survey(self):
-        self._close_psd_listeners()
+        #self._close_psd_listeners()
         self._stop_waveform()
         self._clear_redhawk()
 
