@@ -23,6 +23,7 @@ SRI_MODE_TO_ATOMS = {
     1: 2     # complex - 2 elements per atom
 }
 
+
 def _split_frame(data, frame_size):
     '''
         Splits a data into discrete frames.  Data must be evenly divisible by packet size
@@ -48,6 +49,7 @@ def _split_frame(data, frame_size):
         yield (data[f * frame_size:(f+1)*frame_size], False)
     yield (data[(p-1)* frame_size:p*frame_size], True)
 
+
 class StreamingBridge(object):
     '''
         Tracks streaming data and splits it up into single frames
@@ -62,6 +64,8 @@ class StreamingBridge(object):
         self._lock = threading.RLock()
         self._log = logging.getLogger("bulkio_bridge")
         self._connection_name = None
+        self._their_port = None
+        self._our_port = None
 
     def add_data_listener(self, data_listener):
         with self._lock:
@@ -72,10 +76,9 @@ class StreamingBridge(object):
             self._sri_listeners.append(sri_listener)
             if self.last_sri:
                 try:
-                    self.sri_listener(last_sri)
+                    sri_listener(self.last_sri)
                 except Exception, e:
-                    self._log.exception('%s: Error firing sri %s to %s', self._identity, args, l)
-    
+                    self._log.exception('%s: Error firing sri %s', self._identity, e.args)
 
     def rm_data_listener(self, data_listener):
         with self._lock:
@@ -115,12 +118,11 @@ class StreamingBridge(object):
             remainder = len(data) % self._frame_size
             if remainder:
                 self._log.warn("%s: Unexpected packet size.  Not divisible by frame size.  Packet=%d, frame=%d, modulus=%d",
-                               self._identity, len(dat), self._frame_size, remainder)
+                               self._identity, len(data), self._frame_size, remainder)
 
             # FIXME: timestamp is not coherent for subpackets 
             for f in _split_frame(data, self._frame_size):
                 self._push_frame(f[0], ts, f[1] and EOS, stream_id)
-
 
     def _push_frame(self, data, ts, EOS, stream_id):
         with self._lock:
@@ -128,8 +130,7 @@ class StreamingBridge(object):
                 try:
                     l(data, ts, EOS, stream_id)
                 except Exception, e:
-                    self._log.exception('%s: Error firing data %s to %s', self._identity, args, l)
-
+                    self._log.exception('%s: Error firing data %s to %s', self._identity, e.args, l)
 
     def connectPort(self, port, datatype):
         with self._lock:
