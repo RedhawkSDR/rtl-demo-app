@@ -42,6 +42,7 @@ SRI_MODE_TO_ATOMS = {
     1: 2     # complex - 2 elements per atom
 }
 
+
 def _split_frame(data, frame_size):
     '''
         Splits a data into discrete frames.  Data must be evenly divisible by packet size
@@ -66,6 +67,7 @@ def _split_frame(data, frame_size):
     for f in xrange(p-1):
         yield (data[f * frame_size:(f+1)*frame_size], False)
     yield (data[(p-1)* frame_size:p*frame_size], True)
+
 
 class StreamingBridge(object):
     '''
