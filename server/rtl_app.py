@@ -18,6 +18,138 @@ from _common import BadDemodException, BadFrequencyException, DeviceUnavailableE
 from _utils.tasking import background_task, safe_return_future
 from devices import sim_RX_DIGITIZER
 
+SRI_MODE_TO_ATOMS = {
+    0: 1,    # scalar - 1 element per atom
+    1: 2     # complex - 2 elements per atom
+}
+
+def _split_frame(data, frame_size):
+    '''
+        Splits a data into discrete frames.  Data must be evenly divisible by packet size
+        Returns a tuple of packet + flag, the flag being True when it's the last packet
+
+        >>> d = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
+        >>> [ x for x in _split_frame(d, 3)]
+        [([1, 2, 3], False), ([4, 5, 6], False), ([7, 8, 9], False), ([10, 11, 12], True)]
+        >>> [x for x in _split_frame(d, 4)]
+        [([1, 2, 3, 4], False), ([5, 6, 7, 8], False), ([9, 10, 11, 12], True)]
+        >>> [x for x in _split_frame(d, 6)]
+        [([1, 2, 3, 4, 5, 6], False), ([7, 8, 9, 10, 11, 12], True)]
+        >>> [x for x in _split_frame(d, 1)]
+        [([1], False), ([2], False), ([3], False), ([4], False), ([5], False), ([6], False), ([7], False), ([8], False), ([9], False), ([10], False), ([11], False), ([12], True)]
+        >>> [x for x in _split_frame(d, 2)]
+        [([1, 2], False), ([3, 4], False), ([5, 6], False), ([7, 8], False), ([9, 10], False), ([11, 12], True)]
+        >>> [x for x in _split_frame(d, 12)]
+        [([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12], True)]
+    '''
+
+    p = len(data) / frame_size
+    for f in xrange(p-1):
+        yield (data[f * frame_size:(f+1)*frame_size], False)
+    yield (data[(p-1)* frame_size:p*frame_size], True)
+
+class StreamingBridge(object):
+    '''
+        Tracks streaming data and splits it up into single frames
+    '''
+    def __init__(self, name):
+        self.name = name
+        self._identity = "BulkIO bridge %s" % name
+        self.last_sri = None
+        self._packets = []
+        self._data_listeners = []
+        self._sri_listeners = []
+        self._lock = threading.RLock()
+        self._log = logging.getLogger("bulkio_bridge")
+        self._connection_name = None
+
+    def add_data_listener(self, data_listener):
+        with self._lock:
+            self._data_listeners.append(data_listener)
+
+    def add_sri_listener(self, sri_listener):
+        with self._lock:
+            self._sri_listeners.append(sri_listener)
+            if self.last_sri:
+                try:
+                    self.sri_listener(last_sri)
+                except Exception, e:
+                    self._log.exception('%s: Error firing sri %s to %s', self._identity, args, l)
+    
+
+    def rm_data_listener(self, data_listener):
+        with self._lock:
+            try:
+                self._data_listeners.remove(data_listener)
+            except ValueError:
+                self._log.warn("%s: Data listener %s not found", self._identity, data_listener)
+
+    def rm_sri_listener(self, sri_listener):
+        with self._lock:
+            try:
+                self._sri_listeners.remove(sri_listener)
+            except ValueError:
+                self._log.warn("%s: SRI listener %s not found", self._identity, sri_listener)
+
+    def _push_sri(self, SRI):
+        with self._lock:
+            self._log.debug("%s: got SRI packet %s", self._identity, SRI)
+            try:
+                self._frame_size = SRI.subsize * SRI_MODE_TO_ATOMS[SRI.mode]
+                self.last_sri = SRI
+            except IndexError:
+                self._log.error("%s: Unknown SRI mode %s", self._identity, SRI.mode)
+
+            for l in self._sri_listeners:
+                try:
+                    l(SRI)
+                except Exception, e:
+                    self._log.exception('%s: Error firing sri %s to %s', self._identity, args, l)
+        
+    def _push_data(self, data, ts, EOS, stream_id):
+        with self._lock:
+            if not self.last_sri:
+               self._log.debug("%s: Got %b packet before SRI.  Tossing", self._identity, len(data))
+               return
+
+            remainder = len(data) % self._frame_size
+            if remainder:
+                self._log.warn("%s: Unexpected packet size.  Not divisible by frame size.  Packet=%d, frame=%d, modulus=%d",
+                               self._identity, len(dat), self._frame_size, remainder)
+
+            # FIXME: timestamp is not coherent for subpackets 
+            for f in _split_frame(data, self._frame_size):
+                self._push_frame(f[0], ts, f[1] and EOS, stream_id)
+
+
+    def _push_frame(self, data, ts, EOS, stream_id):
+        with self._lock:
+            for l in self._data_listeners:
+                try:
+                    l(data, ts, EOS, stream_id)
+                except Exception, e:
+                    self._log.exception('%s: Error firing data %s to %s', self._identity, args, l)
+
+
+    def connectPort(self, port, datatype):
+        with self._lock:
+            self._their_port = port
+            self._our_port = AsyncPort(datatype, self._push_sri, self._push_data)
+            connection =  "%s_bridge_%s" % (self.name, id(self))
+            self._their_port.connectPort(self._our_port.getPort(), connection)
+            self._connection_name = connection
+
+    def disconnectPort(self):
+        with self._lock:
+            if self._connection_name:
+                try:
+                    self._their_port.disconnectPort(self._connection_name)
+                except Exception:
+                    self._log.exception("%s: Unable to detach port %s", self._identity, self._connection_name)
+            self._their_port = None
+            self._our_port = None
+            self._connection_name = None
+    
 
 class RTLApp(object):
 
@@ -33,6 +165,7 @@ class RTLApp(object):
         '''
               Instantiate the RTL Application against the given redhawk domain.
         '''
+        self._log = logging.getLogger('RTLApp')
         self._domainname = domainname
         self._frontend = frontend
 
@@ -40,23 +173,12 @@ class RTLApp(object):
         self._device_available = False
 
         # initialize event listener dict
-        self._listeners = {
-           'event': [],
-           RTLApp.PORT_TYPE_WIDEBAND%'data': [],
-           RTLApp.PORT_TYPE_WIDEBAND%'sri': [],
-           RTLApp.PORT_TYPE_NARROWBAND%'data': [],
-           RTLApp.PORT_TYPE_NARROWBAND%'sri': [],
-           RTLApp.PORT_TYPE_FM%'data': [],
-           RTLApp.PORT_TYPE_FM%'sri': []
+        self._event_listeners = []
+        self._bulkio_bridges = {
+           self.PORT_TYPE_WIDEBAND: StreamingBridge('wideband'),
+           self.PORT_TYPE_NARROWBAND: StreamingBridge('narrowband'),
+           self.PORT_TYPE_FM: StreamingBridge('FM'),
         }
-
-        # create streaming callbacks (bridge between BULKIO callback and stream callback)
-        self._push_sri_wb_psd = self._generate_bulkio_callback(self.PORT_TYPE_WIDEBAND, 'sri')
-        self._push_packet_wb_psd = self._generate_bulkio_callback(self.PORT_TYPE_WIDEBAND, 'data')
-        self._push_sri_nb_psd = self._generate_bulkio_callback(self.PORT_TYPE_NARROWBAND, 'sri')
-        self._push_packet_nb_psd = self._generate_bulkio_callback(self.PORT_TYPE_NARROWBAND, 'data')
-        self._push_sri_fm_psd = self._generate_bulkio_callback(self.PORT_TYPE_FM, 'sri')
-        self._push_packet_fm_psd = self._generate_bulkio_callback(self.PORT_TYPE_FM, 'data')
 
         self._clear_redhawk()
 
@@ -67,13 +189,11 @@ class RTLApp(object):
 
     def _clear_redhawk(self):
         # clear the REDHAWK cache
+        self._close_psd_listeners()
         self._domain = None
         self._components = {}
         self._process = None
         self._waveform = None
-        self._wb_psd_port = None
-        self._nb_psd_port = None
-        self._fm_psd_port = None
 
     def get_survey(self):
         '''
@@ -116,6 +236,7 @@ class RTLApp(object):
         return survey
 
     def stop_survey(self):
+        self._close_psd_listeners()
         self._stop_waveform()
         self._clear_redhawk()
 
@@ -178,53 +299,36 @@ class RTLApp(object):
         '''
             Adds a listener for events
         '''
-        self._listeners['event'].append(listener)
+        self._event_listeners.append(listener)
 
     def rm_event_listener(self, listener):
         '''
             Removes a listener for events
         '''
         # FIXME: Is this thread safe
-        self._listeners['event'].remove(listener)
+        self._event_listeners.remove(listener)
 
     def add_stream_listener(self, portname, data_listener, sri_listener=None):
         '''
              Adds a listener for streaming (SRI and Data).
 
              e.g.
-             >>> add_stream_listener(PORTTYPE_WIDEBAND, my_data_listener, my_sri_listener)
+             > add_stream_listener(PORT_TYPE_WIDEBAND, my_data_listener, my_sri_listener)
         '''
-        self._listeners[portname%'data'].append(data_listener)
+        self._bulkio_bridges[portname].add_data_listener(data_listener)
         if sri_listener:
-            self._listeners[portname%'sri'].append(sri_listener)
+            self._bulkio_bridges[portname].add_sri_listener(sri_listener)
            
-            # push out initial SRI packet            
-            if portname == self.PORT_TYPE_WIDEBAND:                
-                if self._wb_psd_port:
-                    self._push_sri_wb_psd(self._wb_psd_port.last_sri)
-            elif portname == self.PORT_TYPE_NARROWBAND:
-                if self._nb_psd_port:
-                    self._push_sri_nb_psd(self._nb_psd_port.last_sri)
-            elif portname == self.PORT_TYPE_FM:
-                if self._fm_psd_port:
-                    self._push_sri_fm_psd(self._fm_psd_port.last_sri)
-                
     def rm_stream_listener(self, portname, data_listener, sri_listener=None):
         '''
              Adds a listener for streaming (SRI and Data).
 
              e.g.
-             >>> add_stream_listener(PORTTYPE_WIDEBAND, my_data_listener, my_sri_listener)
+             > add_stream_listener(PORT_TYPE_WIDEBAND, my_data_listener, my_sri_listener)
         '''
-        try:
-            self._listeners[portname%'data'].remove(data_listener)
-        except ValueError:
-            pass
+        self._bulkio_bridges[portname].rm_data_listener(data_listener)
         if sri_listener:
-            try:
-                self._listeners[portname%'sri'].remove(sri_listener)
-            except ValueError:
-                pass
+            self._bulkio_bridges[portname].rm_sri_listener(sri_listener)
 
 
     def _post_event(self, etype, body):
@@ -232,11 +336,11 @@ class RTLApp(object):
             Internal method to post a new event
         '''
         e = dict(type=etype, body=body)
-        for l in self._listeners['event']:
+        for l in self._event_listeners:
             try:
                 l(e)
             except Exception:
-                logging.exception('Error firing event %s to %s', e, l)
+                self._log.exception('Error firing event %s to %s', e, l)
 
 
     def _get_domain(self):
@@ -253,7 +357,7 @@ class RTLApp(object):
             t = time.time()
             while not self._components.get(compname, None):
                 try:
-                    self._components[compname] = _locate_component(self._get_domain(), compname)
+                    self._components[compname] = self._locate_component(self._get_domain(), compname)
                 except IndexError:
                     delta = time.time() - t
                     if delta > timeout:
@@ -267,43 +371,23 @@ class RTLApp(object):
         return self._get_component('RTL_FM_Controller_1')
         
     def  _init_psd_listeners(self):
-        if not self._wb_psd_port:
-            port = self._get_component('wideband_psd').getPort('psd_dataFloat_out')
-            self._wb_psd_port = AsyncPort(AsyncPort.PORT_TYPE_FLOAT, self._push_sri_wb_psd, self._push_packet_wb_psd)
-            port.connectPort(self._wb_psd_port.getPort(), "wb_psd_%s" % id(self))
+        port = self._get_component('wideband_psd').getPort('psd_dataFloat_out')
+        self._bulkio_bridges[RTLApp.PORT_TYPE_WIDEBAND].connectPort(port, AsyncPort.PORT_TYPE_FLOAT)
 
-        if not self._nb_psd_port:    
-            port = self._get_component('narrowband_psd').getPort('psd_dataFloat_out')
-            self._nb_psd_port = AsyncPort(AsyncPort.PORT_TYPE_FLOAT, self._push_sri_nb_psd, self._push_packet_nb_psd)
-            port.connectPort(self._nb_psd_port.getPort(), "nb_psd_%s" % id(self))
+        port = self._get_component('narrowband_psd').getPort('psd_dataFloat_out')
+        self._bulkio_bridges[RTLApp.PORT_TYPE_NARROWBAND].connectPort(port, AsyncPort.PORT_TYPE_FLOAT)
 
-        if not self._fm_psd_port:    
-            port = self._get_component('fm_psd').getPort('psd_dataFloat_out')
-            self._fm_psd_port = AsyncPort(AsyncPort.PORT_TYPE_FLOAT, self._push_sri_fm_psd, self._push_packet_fm_psd)
-            port.connectPort(self._fm_psd_port.getPort(), "fm_psd_%s" % id(self))
+        port = self._get_component('fm_psd').getPort('psd_dataFloat_out')
+        self._bulkio_bridges[RTLApp.PORT_TYPE_FM].connectPort(port, AsyncPort.PORT_TYPE_FLOAT)
 
-    def _generate_bulkio_callback(self, portname, data_type):
-        '''
-            Generates a callback function that 
-            a listener for a [port + data_type] combination.
-
-            Valid portnames: PORT_TYPE_*
-            Valid data types: 'sri' or 'data' (the bulkio packet)
-        '''
-
-        def bulkio_callback_func(*args):
-            for l in self._listeners[portname % data_type]:
-                try:
-                    l(*args)
-                except Exception, e:
-                    logging.exception('Error firing event %s to %s', args, l)
-        return bulkio_callback_func
+    def _close_psd_listeners(self):
+        for s in self._bulkio_bridges.values():
+            s.disconnectPort()
 
     def _init_application(self):
         self._domain =  redhawk.attach(self._domainname)
-        #self._domain._odmListener = None
-        # self._odmListener = ODMListener()
-        # self._odmListener.connect(self._domain)
+        #self._odmListener = ODMListener()
+        #self._odmListener.connect(self._domain)
 
     def _launch_waveform(self):
         if self._waveform:
@@ -316,55 +400,38 @@ class RTLApp(object):
             raise DeviceUnavailableException('No RTL device available on the system')
 
         try:        
-            logging.info("About to create Rtl_FM_Waveform")
+            self._log.info("About to create Rtl_FM_Waveform")
             # import pdb
             # pdb.set_trace()
             self._waveform = self._get_domain().createApplication('RTL_FM_Waveform')
             self._waveform_name = self._waveform.name
             #FIXME: sleeps are evil
             time.sleep(1)
-            logging.info("Waveform %s created", self._waveform_name)
+            self._log.debug("Waveform %s created", self._waveform_name)
             self._waveform.start()
-            logging.info("Waveform %s started", self._waveform_name)
+            self._log.debug("Waveform %s started", self._waveform_name)
             time.sleep(2)
             self._init_psd_listeners()
-            logging.info("PSD listeners initialized %s", self._waveform_name)
+            self._log.debug("PSD listeners initialized %s", self._waveform_name)
         except Exception:
-            logging.exception("Unable to start waveform")
+            self._log.exception("Unable to start waveform")
             raise
-        # try:
-        #     self._domain.installApplication('/waveforms/Rtl_FM_Waveform/Rtl_FM_Waveform.sad.xml')
-        # except CF.DomainManager.ApplicationAlreadyInstalled:
-        #     logging.info("Waveform Rtl_FM_Waveform already installed", exc_info=1)
-
-        # for appFact in self._get_domain()._get_applicationFactories():
-        #     if appFact._get_identifier() == self.RTL_FM_WAVEFORM_ID:
-        #         try:
-        #         break
 
     def _stop_waveform(self):
         if self._waveform:
             self._waveform.releaseObject()
             self._waveform = None
 
-        # for a in self._get_domain().apps:
-        #     if a._get_name() == self._waveform_name:
-        #         a.releaseObject()
-        #         self._waveform = None
-        #         break
-        # else:
-        #     logging.info("Waveform '%s' not halted - not found", self._waveform_name)
 
-
-def _locate_component(domain, ident):
-    logging.debug("Looking for component %s", ident)
-    idprefix = "%s:" % ident
-    for app in domain.apps:
-        for comp in app.comps:
-            if comp._id.startswith(idprefix):
-                return comp
-    logging.debug("Was not able to find component %s", ident)
-    raise IndexError('No such identifier %s' % ident)
+    def _locate_component(self, domain, ident):
+        self._log.debug("Looking for component %s", ident)
+        idprefix = "%s:" % ident
+        for app in domain.apps:
+            for comp in app.comps:
+                if comp._id.startswith(idprefix):
+                    return comp
+        self._log.debug("Was not able to find component %s", ident)
+        raise IndexError('No such identifier %s' % ident)
 
 
 class AsyncRTLApp(RTLApp):
@@ -376,3 +443,7 @@ class AsyncRTLApp(RTLApp):
     stop_survey = background_task(RTLApp.stop_survey)
     get_device = background_task(RTLApp.get_device)
     poll_device_status = background_task(RTLApp.poll_device_status)
+
+if __name__ == '__main__':
+    import doctest
+    doctest.testmod()

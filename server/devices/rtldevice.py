@@ -72,8 +72,15 @@ class RTL2832U(object):
         return props_to_dict(self.device.query(props_from_dict(dict(target_device=None))))
 
 if __name__ == '__main__':
-    avail = RTL2832U.locate('REDHAWK_DEV').get_available_hardware()
+    from optparse import OptionParser
+    parser = OptionParser()
+    parser.add_option('-d', '--domain',
+                      help='Redhawk Domain', metavar='DOMAIN',
+                      default='REDHAWK_DEV')
+
+    (options, args) = parser.parse_args()
+    avail = RTL2832U.locate(options.domain).get_available_hardware()
     print "RTL Device is %s" % (avail and 'Available' or 'Unavailable')
     if avail:
         pprint.pprint(avail)
-        RTL2832U.locate('REDHAWK_DEV').set_target_hardware(avail[0])
+        RTL2832U.locate(options.domain).set_target_hardware(avail[0])
