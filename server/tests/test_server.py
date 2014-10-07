@@ -38,7 +38,6 @@ from tornado import websocket
 # application imports
 import server
 from rtl_app import MockAsyncRTLApp
-import wsclient
 
 # all method returning suite is required by tornado.testing.main()
 def all():
