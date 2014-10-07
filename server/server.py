@@ -62,7 +62,6 @@ if __name__ == '__main__':
     define("mock", default=False, type=bool, help="Run with the mock application back end")
     define("delay", default=0, type=int, help="Mock delay in milliseconds")
     define("simulate", default=False, type=bool, help="Simulate the RTL device in REDHAWK")
-    define("rtlstat", default=None, type=str, help="Program that returns RTL device status using a successful exit code. 0=ready, 1=not ready")
     define("domain", default="REDHAWK_DEV", help="Redhawk domain")
     define("port", default="8888", help="port")
     define("debug", default=False, type=bool, help="Enable Tornado debug mode.  Reloads code")
