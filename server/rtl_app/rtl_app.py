@@ -125,14 +125,19 @@ class StreamingBridge(object):
                self._log.debug("%s: Got %b packet before SRI.  Tossing", self._identity, len(data))
                return
 
-            remainder = len(data) % self._frame_size
-            if remainder:
-                self._log.warn("%s: Unexpected packet size.  Not divisible by frame size.  Packet=%d, frame=%d, modulus=%d",
-                               self._identity, len(data), self._frame_size, remainder)
+            if self._frame_size:
+                frame_size = self._frame_size if self._frame_size else len(data)
+                remainder = len(data) % frame_size
 
-            # FIXME: timestamp is not coherent for subpackets 
-            for f in _split_frame(data, self._frame_size):
-                self._push_frame(f[0], ts, f[1] and EOS, stream_id)
+                if remainder:
+                    self._log.warn("%s: Unexpected packet size.  Not divisible by frame size.  Packet=%d, frame=%d, modulus=%d",
+                                   self._identity, len(data), frame_size, remainder)
+
+                # FIXME: timestamp is not coherent for subpackets
+                for f in _split_frame(data, frame_size):
+                    self._push_frame(f[0], ts, f[1] and EOS, stream_id)
+            else:
+                self._push_frame(data, ts, EOS, stream_id)
 
     def _push_frame(self, data, ts, EOS, stream_id):
         with self._lock:
@@ -171,6 +176,7 @@ class RTLApp(object):
     PORT_TYPE_WIDEBAND = 'wideband%s'
     PORT_TYPE_NARROWBAND = 'narrowband%s'
     PORT_TYPE_FM = 'fm%s'
+    PORT_TYPE_AUDIO = 'ArbitraryRateResampler%s'
 
     def __init__(self, domainname, frontend=sim_RX_DIGITIZER):
         '''
@@ -189,6 +195,7 @@ class RTLApp(object):
            self.PORT_TYPE_WIDEBAND: StreamingBridge('wideband'),
            self.PORT_TYPE_NARROWBAND: StreamingBridge('narrowband'),
            self.PORT_TYPE_FM: StreamingBridge('FM'),
+           self.PORT_TYPE_AUDIO: StreamingBridge('audio'),
         }
 
         self._clear_redhawk()
@@ -390,6 +397,9 @@ class RTLApp(object):
 
         port = self._get_component('fm_psd').getPort('psd_dataFloat_out')
         self._bulkio_bridges[RTLApp.PORT_TYPE_FM].connectPort(port, AsyncPort.PORT_TYPE_FLOAT)
+
+        port = self._get_component('ArbitraryRateResampler_1').getPort('dataFloat_out')
+        self._bulkio_bridges[RTLApp.PORT_TYPE_AUDIO].connectPort(port, AsyncPort.PORT_TYPE_FLOAT)
 
     def _close_psd_listeners(self):
         for s in self._bulkio_bridges.values():

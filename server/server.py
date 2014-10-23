@@ -52,7 +52,9 @@ def get_application(rtl_app, _ioloop=None, debug=False):
         (_BASE_URL + r"/output/psd/wideband", PSDHandler,
          dict(rtl_app=rtl_app, port_type=rtl_app.PORT_TYPE_WIDEBAND, _ioloop=_ioloop)),
         (_BASE_URL + r"/output/psd/fm", PSDHandler,
-         dict(rtl_app=rtl_app, port_type=rtl_app.PORT_TYPE_FM, _ioloop=_ioloop))
+         dict(rtl_app=rtl_app, port_type=rtl_app.PORT_TYPE_FM, _ioloop=_ioloop)),
+        (_BASE_URL + r"/output/audio", PSDHandler,
+         dict(rtl_app=rtl_app, port_type=rtl_app.PORT_TYPE_AUDIO, _ioloop=_ioloop))
     ], debug=debug)
 
     return my_application
