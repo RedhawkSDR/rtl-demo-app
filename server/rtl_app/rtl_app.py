@@ -247,8 +247,8 @@ class RTLApp(object):
         # try to initialize the application
         self._launch_waveform()
         comp = self._get_manager(timeout=timeout)
-        comp.Frequency = (frequency / 1000000.0)
-        survey = dict(frequency=int(1000000 * round(comp.Frequency, 4)), demod='fm')
+        comp.TuneRequest.frequency = (frequency / 1000000.0)
+        survey = dict(frequency=int(1000000 * round(comp.TuneRequest.frequency, 4)), demod='fm')
 
         self._post_event('survey', survey)
         return survey
@@ -386,7 +386,7 @@ class RTLApp(object):
 
 
     def _get_manager(self, timeout=0):
-        return self._get_component('RTL_FM_Controller_1')
+        return self._get_component('FrontEndController_1')
         
     def  _init_psd_listeners(self):
         port = self._get_component('wideband_psd').getPort('psd_dataFloat_out')
