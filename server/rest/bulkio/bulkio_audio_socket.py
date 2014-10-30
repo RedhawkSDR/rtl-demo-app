@@ -18,20 +18,15 @@
 # along with this program.  If not, see http://www.gnu.org/licenses/.
 #
 import logging
-import numpy
 
 # third party imports
+import numpy
 from tornado import ioloop
 from tornado import websocket
 
-def _floats2bin(flist):
-    """
-        Converts a list of python floating point values
-        to a packed array of IEEE 754 32 bit floating point
-    """
-    return numpy.array(flist).astype('float32').tostring()
+from _utils.audio import wav_hdr
 
-class PSDHandler(websocket.WebSocketHandler):
+class BulkioWavSocketHandler(websocket.WebSocketHandler):
 
     def initialize(self, rtl_app, port_type, _ioloop=None):
         self.rtl_app = rtl_app
@@ -45,6 +40,9 @@ class PSDHandler(websocket.WebSocketHandler):
 
     def open(self, ):
         logging.debug('PSD handler for %s open', self.port_type)
+
+        self._ioloop.add_callback(self.write_message, wav_hdr(1,32000,2), binary=True)
+
         # register event handling
         self.rtl_app.add_stream_listener(self.port_type, self._pushPacket, self._pushSRI)
 
@@ -76,11 +74,11 @@ class PSDHandler(websocket.WebSocketHandler):
     def _pushPacket(self, data, ts, EOS, stream_id):
 
         # FIXME: need to write ts, EOS and stream id
-        self._ioloop.add_callback(self.write_message, _floats2bin(data), binary=True)
+        self._ioloop.add_callback(self.write_message, numpy.array(data).astype('int16').tostring(), binary=True)
 
     def write_message(self, *args, **ioargs):
         # hide WebSocketClosedError because it's very likely
         try:
-            super(PSDHandler, self).write_message(*args, **ioargs)
+            super(BulkioWavSocketHandler, self).write_message(*args, **ioargs)
         except websocket.WebSocketClosedError:
             logging.debug('Received WebSocketClosedError. Ignoring')

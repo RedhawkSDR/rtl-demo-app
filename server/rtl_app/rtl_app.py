@@ -173,10 +173,10 @@ class RTLApp(object):
     FREQUENCY_RANGE = [1000000, 900000000]
     RTL_FM_WAVEFORM_ID = 'DCE:1ed946d9-3e77-4acc-8c2c-912641da6545'
 
-    PORT_TYPE_WIDEBAND = 'wideband%s'
-    PORT_TYPE_NARROWBAND = 'narrowband%s'
-    PORT_TYPE_FM = 'fm%s'
-    PORT_TYPE_AUDIO = 'ArbitraryRateResampler%s'
+    PORT_TYPE_WIDEBAND = 'wideband'
+    PORT_TYPE_NARROWBAND = 'narrowband'
+    PORT_TYPE_FM = 'fm'
+    PORT_TYPE_AUDIO_RAW = 'audio_raw'
 
     def __init__(self, domainname, frontend=sim_RX_DIGITIZER):
         '''
@@ -195,7 +195,7 @@ class RTLApp(object):
            self.PORT_TYPE_WIDEBAND: StreamingBridge('wideband'),
            self.PORT_TYPE_NARROWBAND: StreamingBridge('narrowband'),
            self.PORT_TYPE_FM: StreamingBridge('FM'),
-           self.PORT_TYPE_AUDIO: StreamingBridge('audio'),
+           self.PORT_TYPE_AUDIO_RAW: StreamingBridge('audio_raw')
         }
 
         self._clear_redhawk()
@@ -399,7 +399,7 @@ class RTLApp(object):
         self._bulkio_bridges[RTLApp.PORT_TYPE_FM].connectPort(port, AsyncPort.PORT_TYPE_FLOAT)
 
         port = self._get_component('ArbitraryRateResampler_1').getPort('dataFloat_out')
-        self._bulkio_bridges[RTLApp.PORT_TYPE_AUDIO].connectPort(port, AsyncPort.PORT_TYPE_FLOAT)
+        self._bulkio_bridges[RTLApp.PORT_TYPE_AUDIO_RAW].connectPort(port, AsyncPort.PORT_TYPE_FLOAT)
 
     def _close_psd_listeners(self):
         for s in self._bulkio_bridges.values():
