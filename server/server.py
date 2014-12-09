@@ -28,7 +28,7 @@ import tornado
 from tornado import ioloop
 
 # application imports
-from devices import RTL2832U, sim_RX_DIGITIZER
+from devices import RTL2832U, sim_FM_Device
 
 # setup command line options
 from rest import SurveyHandler, DeviceHandler, EventHandler, PSDHandler
@@ -81,7 +81,7 @@ if __name__ == '__main__':
     domain_args = []
     device = RTL2832U
     if options.simulate:
-        device = sim_RX_DIGITIZER
+        device = sim_FM_Device
 
     if options.mock:
         from mock_rtl_app import AsyncRTLApp

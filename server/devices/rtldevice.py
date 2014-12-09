@@ -27,6 +27,7 @@ from ossie.cf import StandardEvent, ExtendedEvent, CF
 from ossie.properties import props_from_dict, props_to_dict
 
 RTL_ID = 'DCE:82b9903c-6d0e-4a53-b770-bf38e35f24f6'
+RTL_NAME = 'RTL2832U'
 
 class DeviceNotFoundError(StandardError): pass
 
@@ -46,7 +47,11 @@ class RTL2832U(object):
             if RTL_ID == dev._get_identifier():
                 return RTL2832U(dev)
         
-        raise DeviceNotFoundError('RTL2932U')
+        raise DeviceNotFoundError(RTL_NAME)
+
+    @staticmethod
+    def get_fei_device_name():
+        return RTL_NAME
     
     def get_available_hardware(self):
         '''

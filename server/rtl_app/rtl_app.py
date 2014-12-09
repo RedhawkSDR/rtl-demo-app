@@ -202,7 +202,7 @@ class RTLApp(object):
 
         # intialize default values
         self._survey = dict(frequency=None, demod=None)
-        self._device = dict(type='rtl', status='unavailable')
+        self._device = dict(type=self._frontend.get_fei_device_name(), status='unavailable')
 
 
     def _clear_redhawk(self):
@@ -296,10 +296,10 @@ class RTLApp(object):
             if avail:
                 # set the target RTL device (so it is available to be allocated)
                 rtl.set_target_hardware(avail[0])
-                self._device = dict(type='rtl', status='ready')
+                self._device = dict(type=self._frontend.get_fei_device_name(), status='ready')
             else:
                 # FIXME: device is now gone - what action to take
-                self._device = dict(type='rtl', status='unavailable')
+                self._device = dict(type=self._frontend.get_fei_device_name(), status='unavailable')
                 self._stop_waveform()
 
             self._device_available = bool(avail) 
@@ -426,6 +426,10 @@ class RTLApp(object):
             # pdb.set_trace()
             self._waveform = self._get_domain().createApplication('RTL_FM_Waveform')
             self._waveform_name = self._waveform.name
+
+            comp = self._get_manager()
+            comp.FEIDevice.deviceName = self._frontend.get_fei_device_name()
+
             #FIXME: sleeps are evil
             time.sleep(1)
             self._log.debug("Waveform %s created", self._waveform_name)
