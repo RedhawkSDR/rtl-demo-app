@@ -26,7 +26,7 @@ from ossie.utils import redhawk
 from ossie.cf import StandardEvent, ExtendedEvent, CF
 from ossie.properties import props_from_dict, props_to_dict
 
-SIM_ID = 'FmRdsSimulatorNode:FmRdsSimulator_1'
+SIM_ID = 'DCE:3d441470-8e96-4583-bef6-277446048814'
 SIM_NAME = 'FmRdsSimulator'
 
 class DeviceNotFoundError(StandardError): pass

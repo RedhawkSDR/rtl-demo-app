@@ -26,7 +26,7 @@ from ossie.utils import redhawk
 from ossie.cf import StandardEvent, ExtendedEvent, CF
 from ossie.properties import props_from_dict, props_to_dict
 
-RTL_ID = 'DCE:82b9903c-6d0e-4a53-b770-bf38e35f24f6'
+RTL_ID = 'DCE:48ae5916-ea8a-4614-bc41-0380d26b8e70'
 RTL_NAME = 'RTL2832U'
 
 class DeviceNotFoundError(StandardError): pass

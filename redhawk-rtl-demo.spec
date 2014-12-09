@@ -40,6 +40,7 @@ Source0:        %{name}-%{version}.tar.gz
 
 Requires:       python
 Requires:       redhawk >= 1.10
+Requires:       Digitizer_Node
 Requires:       redhawk-devel
 Requires:       redhawk-web
 Requires:       redhawk-admin-console

@@ -21,13 +21,13 @@
 
 RHDOMAIN=REDHAWK_DEV
 
-DIGITIZER_NODE=/nodes/RTL2832_Node/DeviceManager.dcd.xml
+DIGITIZER_NODE=/nodes/Digitizer_Node/DeviceManager.dcd.xml
 
 GPP_NODE_NAME=RTL-Demo-GPP-Node
 GPP_NODE=/nodes/${GPP_NODE_NAME}/DeviceManager.dcd.xml
 
-FEIDEVICE=RTL2832U
-startmsg='with RTL frontend node'
+#FEIDEVICE=RTL2832U
+startmsg='with digitizer frontend node'
 QUOTES=\'\"
 DQUOTE=\"
 
@@ -38,7 +38,6 @@ Usage: $0 [-sh]
    -d DOMAIN
    -r SDRROOT
    -h Show help
-   -s Run with the RTL simulator
 EOFEOF
 }
 
@@ -63,10 +62,7 @@ anywait(){
 }
 
 while getopts "hsd:r:" opt ; do
-    case "$opt" in 
-        s) DIGITIZER_NODE=/nodes/sim_RX_DIGITIZER_Node/DeviceManager.dcd.xml
-           FEIDEVICE=sim_RX_DIGITIZER
-           startmsg='with RTL simulator node' ;;
+    case "$opt" in
         d) RHDOMAIN="$OPTARG" ;;
         r) export SDRROOT="$OPTARG"
            # make absolute
@@ -94,12 +90,6 @@ trap 'killif $pids' 0 1 2 15
 if [ ! -f "$SDRROOT/dev/$GPP_NODE" ]; then
   ${SDRROOT}/dev/devices/GPP/python/nodeconfig.py --domainname=${RHDOMAIN} --nodename=${GPP_NODE_NAME} --inplace
 fi
-
-# FIXME:  Should be waveform init properties from the rtl app
-# modify the domain name and Front end device in waveform
-sed -i "/refid=.DomainName/ s/value=[$QUOTES][^$QUOTES]*[$QUOTES]/value=${DQUOTE}${RHDOMAIN}${DQUOTE}/
-        /refid=.FEIDeviceName/ s/value=[$QUOTES][^$QUOTES]*[$QUOTES]/value=${DQUOTE}${FEIDEVICE}${DQUOTE}/" \
-              "$SDRROOT/dom/waveforms/RTL_FM_Waveform/RTL_FM_Waveform.sad.xml" || err
 
 #NBARGS=--force-rebind --nopersist
 NBARGS=--nopersist
