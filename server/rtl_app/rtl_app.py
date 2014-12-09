@@ -223,7 +223,7 @@ class RTLApp(object):
             }
         '''
         try:
-            return dict(frequency=int(1000000 * round(self._get_manager().Frequency, 4)), demod='fm')
+            return dict(frequency=int(1000000 * round(self._get_manager().TuneRequest.frequency, 4)), demod='fm')
         except (IndexError, StandardError):
             return dict(frequency=None, demod=None)
 
