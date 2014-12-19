@@ -30,7 +30,7 @@
 
 Prefix:         %{_prefix}
 Name:		redhawk-rtl-demo
-Version:	1.0.0
+Version:	1.2.0
 Release:	1%{?dist}
 Summary:	A sample REDHAWK web application that uses an RTL device.
 
