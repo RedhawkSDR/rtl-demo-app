@@ -27,6 +27,7 @@ from ossie.cf import StandardEvent, ExtendedEvent, CF
 from ossie.properties import props_from_dict, props_to_dict
 
 SIM_ID = 'sim_RX_DIGITIZER_Node:sim_RX_DIGITIZER_1'
+SIM_NAME = 'Sim-RX-DIGITIZER'
 
 class DeviceNotFoundError(StandardError): pass
 
@@ -47,6 +48,14 @@ class sim_RX_DIGITIZER(object):
                 return sim_RX_DIGITIZER(dev)
         
         raise DeviceNotFoundError('sim_RX_DIGITIZER')
+
+    @staticmethod
+    def is_simulator():
+      return True
+
+    @staticmethod
+    def get_fei_device_name():
+      return SIM_NAME
     
     def get_available_hardware(self):
         '''

@@ -50,6 +50,10 @@ class sim_FM_Device(object):
     raise DeviceNotFoundError(SIM_NAME)
 
   @staticmethod
+  def is_simulator():
+    return True
+
+  @staticmethod
   def get_fei_device_name():
     return SIM_NAME
 

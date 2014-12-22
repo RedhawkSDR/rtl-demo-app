@@ -50,6 +50,10 @@ class RTL2832U(object):
         raise DeviceNotFoundError(RTL_NAME)
 
     @staticmethod
+    def is_simulator():
+        return False
+
+    @staticmethod
     def get_fei_device_name():
         return RTL_NAME
     
