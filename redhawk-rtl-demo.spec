@@ -46,6 +46,7 @@ Requires:       redhawk-web
 Requires:       redhawk-admin-console
 Requires:       rhweb-python-tornado
 Requires:       python-futures
+Requires:       RTL_FM_Waveform
 BuildRequires:  npm
 BuildRequires:  git
 

@@ -26,7 +26,7 @@ from ossie.utils import redhawk
 from asyncport import AsyncPort
 from _common import BadDemodException, BadFrequencyException, DeviceUnavailableException
 from _utils.tasking import background_task
-from devices import sim_RX_DIGITIZER
+from devices import RTL2832U, sim_FM_Device
 
 SRI_MODE_TO_ATOMS = {
     0: 1,    # scalar - 1 element per atom
@@ -178,7 +178,7 @@ class RTLApp(object):
     PORT_TYPE_FM = 'fm'
     PORT_TYPE_AUDIO_RAW = 'audio_raw'
 
-    def __init__(self, domainname, frontend=sim_RX_DIGITIZER):
+    def __init__(self, domainname, frontend=sim_FM_Device):
         '''
               Instantiate the RTL Application against the given redhawk domain.
         '''
@@ -283,6 +283,29 @@ class RTLApp(object):
         self.poll_device_status()
         return self._device
 
+    def set_simulation(self, use_simulator):
+        '''
+            Switch from using a real device to using a simulation.
+
+        :param use_simulator: Whether to use a simulator
+        '''
+
+        if use_simulator and self._frontend.is_simulator():
+            return Exception("Already using a simulator")
+
+        if not use_simulator and not self._frontend.is_simulator():
+            return Exception("Already using a hardware device")
+
+        if self._waveform:
+            return Exception("Cannot perform on running Waveform")
+
+        logging.warn("SUCCESS")
+
+        if use_simulator:
+            self._frontend = sim_FM_Device
+        else:
+            self._frontend = RTL2832U
+        self.poll_device_status()
 
     def poll_device_status(self):
         '''
@@ -296,10 +319,16 @@ class RTLApp(object):
             if avail:
                 # set the target RTL device (so it is available to be allocated)
                 rtl.set_target_hardware(avail[0])
-                self._device = dict(type=self._frontend.get_fei_device_name(), status='ready')
+                self._device = dict(
+                    type=self._frontend.get_fei_device_name(),
+                    simulator=self._frontend.is_simulator(),
+                    status='ready')
             else:
                 # FIXME: device is now gone - what action to take
-                self._device = dict(type=self._frontend.get_fei_device_name(), status='unavailable')
+                self._device = dict(
+                    type=self._frontend.get_fei_device_name(),
+                    simulator=self._frontend.is_simulator(),
+                    status='unavailable')
                 self._stop_waveform()
 
             self._device_available = bool(avail) 
@@ -467,6 +496,7 @@ class AsyncRTLApp(RTLApp):
     set_survey = background_task(RTLApp.set_survey)
     stop_survey = background_task(RTLApp.stop_survey)
     get_device = background_task(RTLApp.get_device)
+    set_simulation = background_task(RTLApp.set_simulation)
     poll_device_status = background_task(RTLApp.poll_device_status)
 
 if __name__ == '__main__':
