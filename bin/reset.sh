@@ -28,7 +28,7 @@
 sudo service redhawk-web stop
 
 # Brute force
-ps -aef | grep REDHAWK_DEV | awk '{print $2}' | xargs kill -9
+ps -aef | grep REDHAWK_DEV | awk '{print $2}' | xargs sudo kill -9
 
 # Reset REDHAWK
 sudo service omniEvents stop
