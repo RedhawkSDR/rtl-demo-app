@@ -313,22 +313,20 @@ class RTLApp(object):
         '''
         rtl = self._frontend.locate(self._get_domain())
         avail = rtl.get_available_hardware()
+        status = 'ready' if avail else 'unavailable'
+
+        self._device = dict(
+            type=self._frontend.get_fei_device_name(),
+            simulator=self._frontend.is_simulator(),
+            status=status)
 
         # if the availability has changed ...
         if self._device_available != bool(avail):
             if avail:
                 # set the target RTL device (so it is available to be allocated)
                 rtl.set_target_hardware(avail[0])
-                self._device = dict(
-                    type=self._frontend.get_fei_device_name(),
-                    simulator=self._frontend.is_simulator(),
-                    status='ready')
             else:
                 # FIXME: device is now gone - what action to take
-                self._device = dict(
-                    type=self._frontend.get_fei_device_name(),
-                    simulator=self._frontend.is_simulator(),
-                    status='unavailable')
                 self._stop_waveform()
 
             self._device_available = bool(avail) 
