@@ -62,6 +62,7 @@ BuildRequires:  git
 
 %install
 cd rtl-demo-client
+%{?npm_registry: npm set registry %{npm_registry} }
 npm install
 %{bower} install
 %{grunt} dist
@@ -107,3 +108,17 @@ rm -rf %{buildroot}
 %{_nginx}/rtl-demo.enabled
 %{_supervisor}/redhawk-rtl-demo.conf
 %{_supervisor}/redhawk-rtl-demo-domain.conf
+
+
+%changelog
+* Mon Feb 9 2015 Youssef Bagoulla <youssef.bagoulla@axiosengineering.com> - 1.1.0-1
+- Allowing flag for custom npm server.
+
+* Fri Dec 19 2014 Rob Cannon <rob.cannon@axiosengineering.com> - 1.1.0-1
+- Preping for Release 1.1.0
+
+* Thu Sep 25 2014 Rob Cannon <rob.cannon@axiosengineering.com> - 1.0.0-1
+- Updating version for upcoming 1.0.0 release
+
+
+
