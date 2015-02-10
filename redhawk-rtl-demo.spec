@@ -64,7 +64,6 @@ BuildRequires:  git
 cd rtl-demo-client
 %{?npm_registry: npm set registry %{npm_registry} }
 npm install
-%{bower} install
 %{grunt} dist
 cd -
 
