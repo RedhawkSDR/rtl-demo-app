@@ -37,8 +37,6 @@ class BulkioWavStreamHandler(RTLAppHandler):
     if not _ioloop:
       _ioloop = ioloop.IOLoop.instance()
 
-    self.test_file = open("/tmp/output3.wav", "w")
-
     self._ioloop = _ioloop
 
   def get(self):
@@ -46,7 +44,6 @@ class BulkioWavStreamHandler(RTLAppHandler):
     self.set_header('Content-Type', 'audio/wav')
     self.set_header('Transfer-Encoding', 'identity')
 
-    #self.test_file.write(wav_hdr(1,32000,2))
     self.write(wav_hdr(1,32000,2))
 
     # register event handling
@@ -75,8 +72,6 @@ class BulkioWavStreamHandler(RTLAppHandler):
     #wave = pcm2wav(data, 1, 32000)
 
     wave = numpy.array(data).astype('int16')
-
-    #self.test_file.write(wave.tostring())
 
     self.write(wave.tostring())
     self.flush()
