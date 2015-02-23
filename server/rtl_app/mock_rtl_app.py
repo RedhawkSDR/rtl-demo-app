@@ -42,6 +42,7 @@ class RTLApp(object):
     PORT_TYPE_WIDEBAND = 'wideband%s'
     PORT_TYPE_NARROWBAND = 'narrowband%s'
     PORT_TYPE_FM = 'fm%s'
+    PORT_TYPE_AUDIO_RAW = 'audio_raw'
 
 
     def __init__(self, domainname, delayfunc=lambda meth: None):

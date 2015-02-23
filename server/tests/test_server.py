@@ -70,7 +70,7 @@ class RESTfulTest(AsyncHTTPTestCase, LogTrapTestCase):
 
 
     def test_survey_get(self):
-        AsyncHTTPClient(self.io_loop).fetch(self.get_url('/survey'), self.stop)
+        AsyncHTTPClient(self.io_loop).fetch(self.get_url(server._BASE_URL + '/survey'), self.stop)
         response = self.wait()
         self.assertEquals(200, response.code)
         # get the json reply
@@ -85,7 +85,7 @@ class RESTfulTest(AsyncHTTPTestCase, LogTrapTestCase):
 
         # update the survey
         AsyncHTTPClient(self.io_loop).fetch(
-            HTTPRequest(self.get_url('/survey'), 'POST', 
+            HTTPRequest(self.get_url(server._BASE_URL + '/survey'), 'POST',
                         body=json.dumps(pdata)),
                         self.stop)
         responsex = self.wait()
@@ -97,7 +97,7 @@ class RESTfulTest(AsyncHTTPTestCase, LogTrapTestCase):
         self.assertEquals(pdata, data['status'])
 
         # getting the survey should be equal too
-        AsyncHTTPClient(self.io_loop).fetch(self.get_url('/survey'), self.stop)
+        AsyncHTTPClient(self.io_loop).fetch(self.get_url(server._BASE_URL + '/survey'), self.stop)
         response = self.wait()
         self.assertEquals(200, response.code)
         data = json.loads(response.buffer.getvalue())
@@ -111,7 +111,7 @@ class RESTfulTest(AsyncHTTPTestCase, LogTrapTestCase):
 
         # now stop the processing
         AsyncHTTPClient(self.io_loop).fetch(
-            HTTPRequest(self.get_url('/survey'), 'DELETE'), 
+            HTTPRequest(self.get_url(server._BASE_URL + '/survey'), 'DELETE'),
                         self.stop)
 
         response = self.wait()
@@ -124,7 +124,7 @@ class RESTfulTest(AsyncHTTPTestCase, LogTrapTestCase):
         self.assertEquals(None, data['status']['processing'])
 
         # getting the survey should be equal too
-        AsyncHTTPClient(self.io_loop).fetch(self.get_url('/survey'), self.stop)
+        AsyncHTTPClient(self.io_loop).fetch(self.get_url(server._BASE_URL + '/survey'), self.stop)
         response = self.wait()
         self.assertEquals(200, response.code)
         data = json.loads(response.buffer.getvalue())
@@ -135,7 +135,7 @@ class RESTfulTest(AsyncHTTPTestCase, LogTrapTestCase):
         request = dict(frequency=10, processing='fm')
         # Frequency too low
         AsyncHTTPClient(self.io_loop).fetch(
-            HTTPRequest(self.get_url('/survey'), 'POST', 
+            HTTPRequest(self.get_url(server._BASE_URL + '/survey'), 'POST',
                         body=json.dumps(request)),
                         self.stop)
         response = self.wait()
@@ -150,7 +150,7 @@ class RESTfulTest(AsyncHTTPTestCase, LogTrapTestCase):
         # frequency too high
         request = dict(frequency=10e20, processing='fm')
         AsyncHTTPClient(self.io_loop).fetch(
-            HTTPRequest(self.get_url('/survey'), 'POST', 
+            HTTPRequest(self.get_url(server._BASE_URL + '/survey'), 'POST',
                         body=json.dumps(request)),
                         self.stop)
         response = self.wait()
@@ -166,7 +166,7 @@ class RESTfulTest(AsyncHTTPTestCase, LogTrapTestCase):
         badprocessor = 'FKJFKDJFK'
         request = dict(frequency=99500000, processing=badprocessor)
         AsyncHTTPClient(self.io_loop).fetch(
-            HTTPRequest(self.get_url('/survey'), 'POST', 
+            HTTPRequest(self.get_url(server._BASE_URL + '/survey'), 'POST',
                         body=json.dumps(request)),
                         self.stop)
         response = self.wait()
@@ -182,7 +182,7 @@ class RESTfulTest(AsyncHTTPTestCase, LogTrapTestCase):
         request = dict(frequency=10, processing='fm')
         # Frequency too low
         AsyncHTTPClient(self.io_loop).fetch(
-            HTTPRequest(self.get_url('/survey'), 'POST', 
+            HTTPRequest(self.get_url(server._BASE_URL + '/survey'), 'POST',
                         body='this is not jsof:::$#'),
                         self.stop)
         response = self.wait()
@@ -199,7 +199,7 @@ class RESTfulTest(AsyncHTTPTestCase, LogTrapTestCase):
 
     # fixme: does not work yet
     def test_device_get(self):
-        AsyncHTTPClient(self.io_loop).fetch(self.get_url('/device'), self.stop)
+        AsyncHTTPClient(self.io_loop).fetch(self.get_url(server._BASE_URL + '/device'), self.stop)
         response = self.wait()
         self.assertEquals(200, response.code)
         # get the json reply
@@ -208,7 +208,7 @@ class RESTfulTest(AsyncHTTPTestCase, LogTrapTestCase):
         self.assertEquals('unavailable', data['status'])
 
         self._mock_device._set_device('rtl', 'ready')
-        AsyncHTTPClient(self.io_loop).fetch(self.get_url('/device'), self.stop)
+        AsyncHTTPClient(self.io_loop).fetch(self.get_url(server._BASE_URL + '/device'), self.stop)
         response = self.wait()
         self.assertEquals(200, response.code)
         # get the json reply
@@ -223,7 +223,7 @@ class RESTfulTest(AsyncHTTPTestCase, LogTrapTestCase):
         # this causes the application to fail
         self._mock_device._delayfunc = raisefunc
 
-        AsyncHTTPClient(self.io_loop).fetch(self.get_url('/device'), self.stop)
+        AsyncHTTPClient(self.io_loop).fetch(self.get_url(server._BASE_URL + '/device'), self.stop)
         response = self.wait()
         self.assertEquals(500, response.code)
         # get the json reply
@@ -243,7 +243,7 @@ class RESTfulTest(AsyncHTTPTestCase, LogTrapTestCase):
                     _mock_device._set_device('rtl', stat)
                     time.sleep(.2)
   
-        url = self.get_url('/status').replace('http', 'ws')
+        url = self.get_url(server._BASE_URL + '/status').replace('http', 'ws')
         conn1 = yield websocket.websocket_connect(url,
                                                   io_loop=self.io_loop) 
         self.io_loop.add_callback(EventThread().start)
@@ -263,7 +263,7 @@ class RESTfulTest(AsyncHTTPTestCase, LogTrapTestCase):
                     _mock_device._set_device('rtl', stat)
                     time.sleep(.2)
   
-        url = self.get_url('/status').replace('http', 'ws')
+        url = self.get_url(server._BASE_URL + '/status').replace('http', 'ws')
         conn1 = yield websocket.websocket_connect(url,
                                                   io_loop=self.io_loop) 
         conn2 = yield websocket.websocket_connect(url,
@@ -315,7 +315,7 @@ class RESTfulTest(AsyncHTTPTestCase, LogTrapTestCase):
                     _mock_device._post_packet(_mock_device.PORT_TYPE_WIDEBAND, [1, 2, 3, 4], 0, False, 'foo')
                     time.sleep(.2)
   
-        url = self.get_url('/output/psd/wideband').replace('http', 'ws')
+        url = self.get_url(server._BASE_URL + '/output/psd/wideband').replace('http', 'ws')
         conn1 = yield websocket.websocket_connect(url,
                                                   io_loop=self.io_loop) 
         conn2 = yield websocket.websocket_connect(url,
