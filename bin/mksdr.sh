@@ -45,6 +45,8 @@ $thisdir/copysdr.sh /dom/components/FrontEndController
 $thisdir/copysdr.sh /dom/components/NOOP
 $thisdir/copysdr.sh /dom/components/psd
 $thisdir/copysdr.sh /dom/components/TuneFilterDecimate
+$thisdir/copysdr.sh /dom/components/psk_soft
+$thisdir/copysdr.sh /dom/components/RBDSDecoder
 
 # Softpackage dependencies
 $thisdir/copysdr.sh /dom/deps/dsp

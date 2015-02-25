@@ -20,8 +20,13 @@
 import threading
 import time
 import logging
+import pprint
+
+import uuid
 
 from ossie.utils import redhawk
+from ossie.events import GenericEventConsumer
+from ossie import properties
 
 from asyncport import AsyncPort
 from _common import BadDemodException, BadFrequencyException, DeviceUnavailableException
@@ -188,6 +193,8 @@ class RTLApp(object):
 
         self._waveform_name = "rtl_waveform_%s" % id(self)
         self._device_available = False
+        self._event_consumer_id = None
+        self._event_consumer = None
 
         # initialize event listener dict
         self._event_listeners = []
@@ -208,6 +215,14 @@ class RTLApp(object):
     def _clear_redhawk(self):
         # clear the REDHAWK cache
         #self._close_psd_listeners()
+        if self._event_consumer_id and self._domain:
+            try:
+                self._domain.unregisterFromEventChannel(self._event_consumer_id, 'RBDS_Channel')
+            except Exception, e:
+                self._log.exception("domain.unregisterFromEventChannel(%s, 'RBDS_Channel') failed" % self._event_consumer_id)
+        self._event_consumer_id = None
+        # TODO:  Does this actually delete CORBA Servant?
+        self._event_consumer = None
         self._domain = None
         self._components = {}
         self._process = None
@@ -375,7 +390,6 @@ class RTLApp(object):
         if sri_listener:
             self._bulkio_bridges[portname].rm_sri_listener(sri_listener)
 
-
     def _post_event(self, etype, body):
         ''' 
             Internal method to post a new event
@@ -433,7 +447,24 @@ class RTLApp(object):
             s.disconnectPort()
 
     def _init_application(self):
-        self._domain =  redhawk.attach(self._domainname)
+        
+         #  [{'id': 'RBDS_Output', 'value': 
+         #      [{'id': 'RBDS_Output::Full_Text', 'value': 'REDHAWK Radio, Rock the Hawk! (www.redhawksdr.org)              '},
+         #       {'id': 'RBDS_Output::Short_Text', 'value': 'REDHAWK!'}, {'id': 'RBDS_Output::Station_Type', 'value': 'None'}, 
+         #       {'id': 'RBDS_Output::Call_Sign', 'value': 'WSDR'}, 
+         #       {'id': 'RBDS_Output::PI_String', 'value': '848F'}, 
+         #       {'id': 'RBDS_Output::Group', 'value': '0A'}, 
+         #       {'id': 'RBDS_Output::TextFlag', 'value': 'A'}]}]
+        
+        def post_event(event, typecode):            
+            # pprint.pprint(event)
+            d = properties.props_to_dict(event)
+            self._post_event('rds', _rds_map_translate(d['RBDS_Output']))
+            
+        self._domain = redhawk.attach(self._domainname)
+        self._event_consumer = GenericEventConsumer(post_event, keep_structs=True)
+        self._event_consumer_id = str(uuid.uuid1())
+        self._domain.registerWithEventChannel(self._event_consumer._this(), self._event_consumer_id, 'RBDS_Channel')
         #self._odmListener = ODMListener()
         #self._odmListener.connect(self._domain)
 
@@ -485,6 +516,8 @@ class RTLApp(object):
         self._log.debug("Was not able to find component %s", ident)
         raise IndexError('No such identifier %s' % ident)
 
+def _rds_map_translate(rds_event_map):
+    return dict([(k.replace('RBDS_Output::', ''), v) for k, v in rds_event_map.items()])
 
 class AsyncRTLApp(RTLApp):
     '''

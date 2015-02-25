@@ -54,6 +54,7 @@ killif() {
 
 anywait(){
    while true ; do
+       set +x
        for pid in "$@" ; do
            [[ ! -e /proc/$pid ]] && return
        done

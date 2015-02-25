@@ -19,14 +19,11 @@
 # along with this program.  If not, see http://www.gnu.org/licenses/.
 #
 import unittest
-import sys
 import rtl_app
 import time
 import collections
-from tornado import gen
+import difflib
 import logging
-import os
-from subprocess import Popen, PIPE
 
 class RTLAppTest(unittest.TestCase):
 
@@ -148,6 +145,46 @@ class RTLAppTest(unittest.TestCase):
 
     def test_streaming_narrow(self):
         self.test_streaming(porttype=rtl_app.RTLApp.PORT_TYPE_NARROWBAND)
+
+    def test_rds(self):
+        rtl = self.rtl_app
+
+        events = collections.deque()
+        def elisten(event):
+            events.append(event)
+        rtl.add_event_listener(elisten)
+
+        a = rtl.set_survey(frequency=101100000, demod='fm')
+        time.sleep(2)
+        a = rtl.stop_survey()
+
+        # test all of the events and get the max similarity
+        def maxsimilar(smap, event, field, value, threshold=.5):
+            # print event
+            s = self.similarity(value, event[field])
+            v = dict(similarity=s, best=event[field], value=value, threshold=threshold)
+            if s >= smap.get(field, v)['similarity']:
+                smap[field] = v
+
+        m = {}
+        for e in events:
+            if e['type'] != 'rds':
+                continue
+            maxsimilar(m, e['body'], 'Full_Text', 'REDHAWK Radio, Rock the Hawk! (www.redhawksdr.org)', .05)
+            maxsimilar(m, e['body'], 'Short_Text', 'REDHAWK!', .3)
+            maxsimilar(m, e['body'], 'Call_Sign', 'WSDR')
+            maxsimilar(m, e['body'], 'Group', '0A')
+            maxsimilar(m, e['body'], 'TextFlag', 'A')
+            maxsimilar(m, e['body'], 'PI_String', '848F')
+        
+        issues = filter(lambda x: x[1]['similarity'] < x[1]['threshold'], m.items())
+        if issues:
+            self.fail("Bad fields %s" % issues)
+            
+
+    def similarity(self, str1, str2):
+        return difflib.SequenceMatcher(lambda x: x == ' ', str1, str2).ratio()
+
 
 if __name__ == '__main__':
     print "Run REDHAWK_TEST"
