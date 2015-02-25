@@ -22,10 +22,13 @@ verify_domain() {
 
 usage() {
     cat <<EOFEOF
-Usage: $0 [-hs]
+Usage: $0 [-hs] [nosetests args]
 
     -h             Show help
     -s             Bootstrap the test environment
+
+Example:
+   $0 test:RTLAppTest.test_rds
 EOFEOF
 }
 
@@ -35,7 +38,8 @@ bootstrap() {
 
 runtest() {
    verify_domain 
-   (cd "$srcdir" &&  "$mydir"/../.virtualenv/bin/python /usr/bin/nosetests ./test.py)
+   [ $# -lt 1 ] && set test 
+   (cd "$srcdir" &&  set -x && "$mydir"/../.virtualenv/bin/python /usr/bin/nosetests "$@")
 }
 
 PROGRAM=runtest
@@ -48,4 +52,4 @@ while getopts "hs" opt ; do
 done
 shift $((OPTIND-1))
 
-$PROGRAM
+$PROGRAM "$@"
