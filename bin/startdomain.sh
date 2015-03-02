@@ -21,6 +21,7 @@
 
 RHDOMAIN=REDHAWK_DEV
 
+DIGITIZER_NODE_NAME=Digitizer_Node
 DIGITIZER_NODE=/nodes/Digitizer_Node/DeviceManager.dcd.xml
 
 GPP_NODE_NAME=RTL-Demo-GPP-Node
@@ -28,6 +29,7 @@ GPP_NODE=/nodes/${GPP_NODE_NAME}/DeviceManager.dcd.xml
 
 #FEIDEVICE=RTL2832U
 startmsg='with digitizer frontend node'
+noPrivMsg='Insufficient privileges to overwrite existing directory in SDR Root:'
 QUOTES=\'\"
 DQUOTE=\"
 
@@ -62,6 +64,24 @@ anywait(){
    done
 }
 
+checkSdr(){
+       checkPrivs "${SDRROOT}/dev/.${DIGITIZER_NODE_NAME}"
+       status1=$?
+       checkPrivs "${SDRROOT}/dev/.${GPP_NODE_NAME}"
+       status2=$?
+       
+       if [[ "$status1" != 0 || "$status2" != 0 ]]; then
+          exit 1;
+       fi
+}
+
+checkPrivs(){
+   if [[ -d "$1" &&  (! -r "$1" || ! -w "$1" || ! -x "$1") ]]; then
+      echo "$noPrivMsg" "$1"
+      return 1
+   fi
+}
+
 while getopts "hsd:r:" opt ; do
     case "$opt" in
         d) RHDOMAIN="$OPTARG" ;;
@@ -82,6 +102,8 @@ fi
 
 export LOGDIR="$SDRROOT"/dom/logs
 mkdir -p ${LOGDIR}
+
+checkSdr
 
 pids=
 
