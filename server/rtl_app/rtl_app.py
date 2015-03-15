@@ -182,6 +182,8 @@ class RTLApp(object):
     PORT_TYPE_NARROWBAND = 'narrowband'
     PORT_TYPE_FM = 'fm'
     PORT_TYPE_AUDIO_RAW = 'audio_raw'
+    PORT_TYPE_PSK_SHORT = 'psk_short'
+    PORT_TYPE_PSK_FLOAT = 'psk_float'
 
     def __init__(self, domainname, frontend=sim_FM_Device):
         '''
@@ -202,7 +204,9 @@ class RTLApp(object):
            self.PORT_TYPE_WIDEBAND: StreamingBridge('wideband'),
            self.PORT_TYPE_NARROWBAND: StreamingBridge('narrowband'),
            self.PORT_TYPE_FM: StreamingBridge('FM'),
-           self.PORT_TYPE_AUDIO_RAW: StreamingBridge('audio_raw')
+           self.PORT_TYPE_AUDIO_RAW: StreamingBridge('audio_raw'),
+           self.PORT_TYPE_PSK_FLOAT: StreamingBridge('psk_float'),
+           self.PORT_TYPE_PSK_SHORT: StreamingBridge('psk_short'),
         }
 
         self._clear_redhawk()
@@ -320,7 +324,7 @@ class RTLApp(object):
             self._frontend = sim_FM_Device
         else:
             self._frontend = RTL2832U
-        self.poll_device_status()
+        return self.poll_device_status()
 
     def poll_device_status(self):
         '''
@@ -442,6 +446,12 @@ class RTLApp(object):
         port = self._get_component('ArbitraryRateResampler_1').getPort('dataFloat_out')
         self._bulkio_bridges[RTLApp.PORT_TYPE_AUDIO_RAW].connectPort(port, AsyncPort.PORT_TYPE_FLOAT)
 
+        port = self._get_component('psk_soft_1').getPort('dataFloat_out')
+        self._bulkio_bridges[RTLApp.PORT_TYPE_PSK_FLOAT].connectPort(port, AsyncPort.PORT_TYPE_FLOAT)
+
+        port = self._get_component('psk_soft_1').getPort('dataShort_out')
+        self._bulkio_bridges[RTLApp.PORT_TYPE_PSK_SHORT].connectPort(port, AsyncPort.PORT_TYPE_SHORT)
+
     def _close_psd_listeners(self):
         for s in self._bulkio_bridges.values():
             s.disconnectPort()
@@ -473,15 +483,13 @@ class RTLApp(object):
             return
 
         # update device status
-        self.poll_device_status()
+        self.poll_device_status._sync_func(self)
 
         if not self._device_available:
             raise DeviceUnavailableException('No RTL device available on the system')
 
         try:        
             self._log.info("About to create Rtl_FM_Waveform")
-            # import pdb
-            # pdb.set_trace()
             self._waveform = self._get_domain().createApplication('RTL_FM_Waveform')
             self._waveform_name = self._waveform.name
 

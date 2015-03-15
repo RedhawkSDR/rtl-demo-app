@@ -21,16 +21,16 @@ import numpy
 
 from bulkio_handler import BulkioHandler
 
-class BulkioFloatHandler(BulkioHandler):
+class BulkioShortHandler(BulkioHandler):
 
     @staticmethod
-    def __floats2bin(flist):
+    def __shorts2bin(flist):
       """
           Converts a list of python floating point values
           to a packed array of IEEE 754 32 bit floating point
       """
-      return numpy.array(flist).astype('float32').tostring()
+      return numpy.array(flist).astype('int16').tostring()
 
     def _pushPacket(self, data, ts, EOS, stream_id):
-        super(BulkioFloatHandler, self)._pushPacket(self.__floats2bin(data), ts, EOS, stream_id)
+        super(BulkioShortHandler, self)._pushPacket(self.__shorts2bin(data), ts, EOS, stream_id)
 

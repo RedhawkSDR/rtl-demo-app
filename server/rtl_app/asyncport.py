@@ -52,7 +52,7 @@ class AsyncPort(object):
         self._pushPacket_callback = pushPacket
 
         self._logger = logging.getLogger(self.__class__.__name__)
-    
+
     def start(self):
         self.eos = False
         

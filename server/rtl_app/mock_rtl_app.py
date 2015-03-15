@@ -43,6 +43,8 @@ class RTLApp(object):
     PORT_TYPE_NARROWBAND = 'narrowband%s'
     PORT_TYPE_FM = 'fm%s'
     PORT_TYPE_AUDIO_RAW = 'audio_raw'
+    PORT_TYPE_PSK_FLOAT = 'psk_float%s'
+    PORT_TYPE_PSK_SHORT = 'psk_short%s'
 
 
     def __init__(self, domainname, delayfunc=lambda meth: None):
@@ -57,7 +59,11 @@ class RTLApp(object):
            self.PORT_TYPE_WIDEBAND%'data': [],
            self.PORT_TYPE_WIDEBAND%'sri': [],
            self.PORT_TYPE_NARROWBAND%'data': [],
-           self.PORT_TYPE_NARROWBAND%'sri': []
+           self.PORT_TYPE_NARROWBAND%'sri': [],
+           self.PORT_TYPE_PSK_FLOAT%'sri': [],
+           self.PORT_TYPE_PSK_FLOAT%'data': [],
+           self.PORT_TYPE_PSK_SHORT%'sri': [],
+           self.PORT_TYPE_PSK_SHORT%'data': [],
         }
 
         self._survey = dict(frequency=None, demod=None)

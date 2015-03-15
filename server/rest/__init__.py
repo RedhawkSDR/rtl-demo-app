@@ -21,6 +21,7 @@ from device_handler import DeviceHandler
 from event_handler import EventHandler
 from bulkio.bulkio_handler import BulkioHandler
 from bulkio.bulkio_float_handler import BulkioFloatHandler
+from bulkio.bulkio_short_handler import BulkioShortHandler
 from bulkio.bulkio_audio_socket import BulkioWavSocketHandler
 from bulkio.bulkio_audio_stream import BulkioWavStreamHandler
 from survey_handler import SurveyHandler

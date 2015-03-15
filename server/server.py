@@ -32,7 +32,7 @@ from devices import RTL2832U, sim_FM_Device
 
 # setup command line options
 from rest import SurveyHandler, DeviceHandler, EventHandler
-from rest import BulkioFloatHandler, BulkioWavStreamHandler, BulkioWavSocketHandler
+from rest import BulkioFloatHandler, BulkioShortHandler, BulkioWavStreamHandler, BulkioWavSocketHandler
 from rtl_app import AsyncRTLApp
 
 # establish static directory from this module as one up from current
@@ -59,8 +59,12 @@ def get_application(rtl_app, _ioloop=None, debug=False):
         (_BASE_URL + r"/output/audio_wav", BulkioWavSocketHandler,
          dict(rtl_app=rtl_app, port_type=rtl_app.PORT_TYPE_AUDIO_RAW, _ioloop=_ioloop)),
         (_BASE_URL + r"/output/stream", BulkioWavStreamHandler,
-         dict(rtl_app=rtl_app, port_type=rtl_app.PORT_TYPE_AUDIO_RAW, _ioloop=_ioloop))
-    ], debug=debug)
+         dict(rtl_app=rtl_app, port_type=rtl_app.PORT_TYPE_AUDIO_RAW, _ioloop=_ioloop)),
+        (_BASE_URL + r"/output/psk/float", BulkioFloatHandler,
+         dict(rtl_app=rtl_app, port_type=rtl_app.PORT_TYPE_PSK_FLOAT, subsize=1024, APE=2, _ioloop=_ioloop)),
+        (_BASE_URL + r"/output/psk/short", BulkioShortHandler,
+         dict(rtl_app=rtl_app, port_type=rtl_app.PORT_TYPE_PSK_SHORT, subsize=416, APE=1, _ioloop=_ioloop))
+        ], debug=debug)
 
     return my_application
 

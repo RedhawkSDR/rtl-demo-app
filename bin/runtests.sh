@@ -22,13 +22,15 @@ verify_domain() {
 
 usage() {
     cat <<EOFEOF
-Usage: $0 [-hs] [nosetests args]
+Usage: $0 [-hs] [--] [nosetests args]
 
     -h             Show help
     -s             Bootstrap the test environment
+    --             Used to end $0 args, start nosttests args
 
-Example:
+Examples:
    $0 test:RTLAppTest.test_rds
+   $0 -- -s test:RESTfulTest.test_streaming_ws
 EOFEOF
 }
 
@@ -39,14 +41,15 @@ bootstrap() {
 runtest() {
    verify_domain 
    [ $# -lt 1 ] && set test 
-   (cd "$srcdir" &&  set -x && "$mydir"/../.virtualenv/bin/python /usr/bin/nosetests "$@")
+   (cd "$srcdir" &&  set -x && "$mydir"/../.virtualenv/bin/python /usr/bin/nosetests1.1 "$@")
 }
 
 PROGRAM=runtest
-while getopts "hs" opt ; do
+while getopts "hs-" opt ; do
     case "$opt" in
         s) PROGRAM=bootstrap ;;
         h) usage; exit 0 ;;
+        -) break;;
         *) err "BAD PARAMETER $opt" ;;
     esac
 done

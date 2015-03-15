@@ -266,7 +266,11 @@ def get_application(rtl_app, _ioloop=None):
         (r"/output/psd/wideband", PSDHandler,
          dict(rtl_app=rtl_app, port_type=rtl_app.PORT_TYPE_WIDEBAND, _ioloop=_ioloop)),
         (r"/output/psd/fm", PSDHandler,
-         dict(rtl_app=rtl_app, port_type=rtl_app.PORT_TYPE_FM, _ioloop=_ioloop))
+         dict(rtl_app=rtl_app, port_type=rtl_app.PORT_TYPE_FM, _ioloop=_ioloop)),
+        (r"/output/psk/float", PSDHandler,
+         dict(rtl_app=rtl_app, port_type=rtl_app.PORT_TYPE_PSK_FLOAT, _ioloop=_ioloop)),
+        (r"/output/psk/short", PSDHandler,
+         dict(rtl_app=rtl_app, port_type=rtl_app.PORT_TYPE_PSK_SHORT, _ioloop=_ioloop))
     ], debug=options.debug)
 
     return application
