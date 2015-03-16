@@ -482,8 +482,8 @@ class RTLApp(object):
         if self._waveform:
             return
 
-        # update device status
-        self.poll_device_status._sync_func(self)
+        # update device status (can't use self.poll_device_status() because it may be async)
+        RTLApp.poll_device_status(self)
 
         if not self._device_available:
             raise DeviceUnavailableException('No RTL device available on the system')

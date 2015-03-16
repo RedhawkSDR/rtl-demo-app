@@ -55,7 +55,9 @@ class RealRESTfulTest(AsyncHTTPTestCase):
     #     super(RESTfulTest, self).setUp()
     #     rtl_app.RTLApp('REDHAWK_DEV').stop_survey()
     def setUp(self):
-        logging.getLogger().setLevel(logging.DEBUG)
+        super(RealRESTfulTest, self).setUp()
+
+    def tearDown(self):
         super(RealRESTfulTest, self).setUp()
 
     def get_app(self):
@@ -63,16 +65,21 @@ class RealRESTfulTest(AsyncHTTPTestCase):
         concurrent_rtl_class = AsyncRTLApp
 
         # application renewed each test case
-        self._rtl_app = concurrent_rtl_class('REDHAWK_TEST')
-        return server.get_application(self._rtl_app,
+        if not hasattr(self, '_rtl_app'):
+            self._rtl_app = concurrent_rtl_class('REDHAWK_TEST')
+            self._server = server.get_application(self._rtl_app,
                                       _ioloop=self.io_loop)
+        return self._server
 
 
     @tornado.testing.gen_test(timeout=60)
-    def test_streaming_psk_float(self, url='/output/psk/float', bytes=1024):
+    def test_streaming_psk_float(self, url='/output/psk/float', bytes=2048):
         yield self._rtl_app.set_simulation(True)
         yield self._rtl_app.set_survey(101000000, 'fm')
         url = self.get_url(server._BASE_URL + url).replace('http', 'ws')
+        for k, bridge in self._rtl_app._bulkio_bridges.items():
+            self.assertEquals(0, len(bridge._data_listeners), 
+                              msg="Expecting 0 listeners for %s, got %d" % (k, len(bridge._data_listeners)))
         conn1 = yield websocket.websocket_connect(url,
                                                   io_loop=self.io_loop)
         conn2 = yield websocket.websocket_connect(url,
@@ -85,8 +92,9 @@ class RealRESTfulTest(AsyncHTTPTestCase):
                 data = json.loads(message)
                 print "Connection 1 message #%s: %s" % (x, message)
             except Exception, e:
-                print e
+                size = len(message)
                 print "Connection 1 message #%s: %s bytes" % (x, len(message))
+                self.assertEquals(bytes, size)
             # self.assertEquals(stat, data['body']['status'])
 
             # FIXME: assert SRI
@@ -97,11 +105,15 @@ class RealRESTfulTest(AsyncHTTPTestCase):
             # data = json.loads(message)
             # self.assertEquals(stat, data['body']['status'])
         conn1.close()
-        conn2.close()        
+        conn2.close()
+        # Need to yield a few seconds to allow connections to close (time.sleep does not work w/async)
+        yield tornado.gen.Task(self.io_loop.add_timeout, time.time() + 2)
+        for k, bridge in self._rtl_app._bulkio_bridges.items():
+            self.assertEquals(0, len(bridge._data_listeners),
+                              msg="Expecting 0 listeners for %s, got %d" % (k, len(bridge._data_listeners)))
         # FIXME: Ensure that close is being called on websocket so that is tested
         # tried with stop(), but unsure if that does anything
         self.stop()
-        self.fail("Whatever")
 
 
         

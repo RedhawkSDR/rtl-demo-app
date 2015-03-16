@@ -122,7 +122,6 @@ def background_task(func):
         EXECUTOR.submit(partial(_do_task, *args, **kwargs))
         return future
 
-    exec_background._sync_func = func
     exec_background.__doc__ = \
         ("%s\nbackground_task() wrapped function.\n" +
          "Runs asynchronously and returns a Future.\n" +

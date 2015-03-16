@@ -43,7 +43,7 @@ class BulkioHandler(websocket.WebSocketHandler):
         self._ioloop = _ioloop
 
     def open(self, ):
-        logger.debug('PSD handler for %s open', self.port_type)
+        logger.debug('BulkIO handler for %s open', self.port_type)
         # register event handling
         self.rtl_app.add_stream_listener(self.port_type, self._pushPacket, self._pushSRI)
 
@@ -75,7 +75,7 @@ class BulkioHandler(websocket.WebSocketHandler):
     def _pushPacket(self, data, ts, EOS, stream_id):
         # FIXME: need to write ts, EOS and stream id
 
-        logger.error("_pushPacket[%s] received %s bytes.  Buffer %d bytes, blocksize=%d",
+        logger.debug("_pushPacket[%s] received %s bytes.  Buffer %d bytes, blocksize=%d",
                      self.port_type, len(data), len(self.buffer), self.blocksize)
         if not self.blocksize:
             self._ioloop.add_callback(self.write_message, data, binary=True)
