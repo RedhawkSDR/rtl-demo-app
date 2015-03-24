@@ -58,26 +58,24 @@ class RealRESTfulTest(AsyncHTTPTestCase):
         super(RealRESTfulTest, self).setUp()
 
     def tearDown(self):
-        super(RealRESTfulTest, self).setUp()
+        self._app._xx_rtl_app.stop_survey()
+        super(RealRESTfulTest, self).tearDown()
+        
 
     def get_app(self):
         # create a concurrent version of the applicaiton
-        concurrent_rtl_class = AsyncRTLApp
-
-        # application renewed each test case
-        if not hasattr(self, '_rtl_app'):
-            self._rtl_app = concurrent_rtl_class('REDHAWK_TEST')
-            self._server = server.get_application(self._rtl_app,
-                                      _ioloop=self.io_loop)
-        return self._server
+        _rtl_app = AsyncRTLApp('REDHAWK_TEST')
+        app = server.get_application(_rtl_app, _ioloop=self.io_loop)
+        app._xx_rtl_app = _rtl_app
+        return app
 
 
     @tornado.testing.gen_test(timeout=60)
     def test_streaming_psk_float(self, url='/output/psk/float', bytes=2048):
-        yield self._rtl_app.set_simulation(True)
-        yield self._rtl_app.set_survey(101000000, 'fm')
+        yield self._app._xx_rtl_app.set_simulation(True)
+        yield self._app._xx_rtl_app.set_survey(101000000, 'fm')
         url = self.get_url(server._BASE_URL + url).replace('http', 'ws')
-        for k, bridge in self._rtl_app._bulkio_bridges.items():
+        for k, bridge in self._app._xx_rtl_app._bulkio_bridges.items():
             self.assertEquals(0, len(bridge._data_listeners), 
                               msg="Expecting 0 listeners for %s, got %d" % (k, len(bridge._data_listeners)))
         conn1 = yield websocket.websocket_connect(url,
@@ -108,7 +106,7 @@ class RealRESTfulTest(AsyncHTTPTestCase):
         conn2.close()
         # Need to yield a few seconds to allow connections to close (time.sleep does not work w/async)
         yield tornado.gen.Task(self.io_loop.add_timeout, time.time() + 2)
-        for k, bridge in self._rtl_app._bulkio_bridges.items():
+        for k, bridge in self._app._xx_rtl_app._bulkio_bridges.items():
             self.assertEquals(0, len(bridge._data_listeners),
                               msg="Expecting 0 listeners for %s, got %d" % (k, len(bridge._data_listeners)))
         # FIXME: Ensure that close is being called on websocket so that is tested

@@ -372,11 +372,11 @@ class RESTfulTest(AsyncHTTPTestCase):
         class DataThread(threading.Thread):
             def run(self):
                 for x in xrange(5):
-                    _mock_device._post_packet(_mock_device.PORT_TYPE_WIDEBAND, [1, 2, 3, 4], 0, False, 'foo')
+                    _mock_device._post_packet(_mock_device.PORT_TYPE_PSK_FLOAT, [64.0] * 2048, 0, False, 'foo')
                     time.sleep(.2)
 
         print "TESTING"
-        url = self.get_url(server._BASE_URL + '/output/psd/wideband').replace('http', 'ws')
+        url = self.get_url(server._BASE_URL + '/output/psk/float').replace('http', 'ws')
         conn1 = yield websocket.websocket_connect(url,
                                                   io_loop=self.io_loop)
         conn2 = yield websocket.websocket_connect(url,

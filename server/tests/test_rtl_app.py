@@ -171,7 +171,7 @@ class RTLAppTest(unittest.TestCase):
             if e['type'] != 'rds':
                 continue
             maxsimilar(m, e['body'], 'Full_Text', 'REDHAWK Radio, Rock the Hawk! (www.redhawksdr.org)', .05)
-            maxsimilar(m, e['body'], 'Short_Text', 'REDHAWK!', .3)
+            maxsimilar(m, e['body'], 'Short_Text', '100.1 FM', .3)
             maxsimilar(m, e['body'], 'Call_Sign', 'WSDR')
             maxsimilar(m, e['body'], 'Group', '0A')
             maxsimilar(m, e['body'], 'TextFlag', 'A')

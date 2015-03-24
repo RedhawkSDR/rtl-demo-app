@@ -19,3 +19,4 @@
 #
 from test_rtl_app import *
 from test_server import *
+from test_real_server import *
