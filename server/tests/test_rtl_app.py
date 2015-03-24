@@ -75,13 +75,13 @@ class RTLAppTest(unittest.TestCase):
             a = rtl.set_survey(frequency=100, demod='fm')
             self.fail("expected bad frequency error")
         except rtl_app.BadFrequencyException, e:
-            self.assertEquals("Bad frequency 100", e.message)
+            self.assertEquals("Bad frequency 100", e.args[0])
 
         try:
             a = rtl.set_survey(frequency=101100000, demod='nutrino')
             self.fail("expected bad frequency error")
         except rtl_app.BadDemodException, e:
-            self.assertEquals("Bad demodulator 'nutrino'", e.message)
+            self.assertEquals("Bad demodulator 'nutrino'", e.args[0])
 
         a = rtl.stop_survey()
         self.assertEquals(None, a['demod'])
