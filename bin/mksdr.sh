@@ -39,14 +39,13 @@ $thisdir/copysdr.sh /dom/waveforms/RTL_FM_Waveform
 # FM Components
 $thisdir/copysdr.sh /dom/components/AmFmPmBasebandDemod
 $thisdir/copysdr.sh /dom/components/ArbitraryRateResampler
-$thisdir/copysdr.sh /dom/components/DataConverter
 $thisdir/copysdr.sh /dom/components/fastfilter
 $thisdir/copysdr.sh /dom/components/FrontEndController
 $thisdir/copysdr.sh /dom/components/NOOP
 $thisdir/copysdr.sh /dom/components/psd
-$thisdir/copysdr.sh /dom/components/TuneFilterDecimate
 $thisdir/copysdr.sh /dom/components/psk_soft
 $thisdir/copysdr.sh /dom/components/RBDSDecoder
+$thisdir/copysdr.sh /dom/components/TuneFilterDecimate
 
 # Softpackage dependencies
 $thisdir/copysdr.sh /dom/deps/dsp
