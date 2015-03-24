@@ -111,7 +111,7 @@ pids=
 trap 'killif $pids' 0 1 2 15
 
 if [ ! -f "$SDRROOT/dev/$GPP_NODE" ]; then
-  ${SDRROOT}/dev/devices/GPP/python/nodeconfig.py --domainname=${RHDOMAIN} --nodename=${GPP_NODE_NAME} --inplace
+  ${SDRROOT}/dev/devices/GPP/python/nodeconfig.py --domainname=${RHDOMAIN} --nodename=${GPP_NODE_NAME} || err
 fi
 
 #NBARGS=--force-rebind --nopersist
