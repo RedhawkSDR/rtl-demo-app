@@ -26,11 +26,14 @@ Usage: $0 [-hs] [--] [nosetests args]
 
     -h             Show help
     -s             Bootstrap the test environment
+    -l             Show the domain logs
     --             Used to end $0 args, start nosttests args
 
 Examples:
    $0 test:RTLAppTest.test_rds
    $0 -- -s test:RESTfulTest.test_streaming_ws
+   To list the tests
+   $0 -- -v --collect-only
 EOFEOF
 }
 
@@ -41,13 +44,18 @@ bootstrap() {
 runtest() {
    verify_domain 
    [ $# -lt 1 ] && set test 
-   (cd "$srcdir" &&  set -x && "$mydir"/../.virtualenv/bin/python /usr/bin/nosetests1.1 "$@")
+   (cd "$srcdir" &&  set -x && "$mydir"/../.virtualenv/bin/python /usr/bin/nosetests1.1 "$@") 2>&1 | tee runtests.out
+}
+
+showlog() {
+   less "$mydir"/sdr/dom/logs/* 
 }
 
 PROGRAM=runtest
-while getopts "hs-" opt ; do
+while getopts "hls-" opt ; do
     case "$opt" in
         s) PROGRAM=bootstrap ;;
+        l) PROGRAM=showlog ;;
         h) usage; exit 0 ;;
         -) break;;
         *) err "BAD PARAMETER $opt" ;;
