@@ -61,14 +61,14 @@ BuildRequires:  git
 %build
 
 %install
-cd rtl-demo-client
+cd client
 %{?npm_registry: npm set registry %{npm_registry} }
 npm install
 %{grunt} dist
 cd -
 
 mkdir -p $RPM_BUILD_ROOT%{_rtl_demo}
-cp -R rtl-demo-client/dist $RPM_BUILD_ROOT%{_rtl_client}
+cp -R client/dist $RPM_BUILD_ROOT%{_rtl_client}
 
 mkdir -p $RPM_BUILD_ROOT%{_rtl_app}
 cp -R rtl-demo-app/bin rtl-demo-app/server $RPM_BUILD_ROOT%{_rtl_app}
