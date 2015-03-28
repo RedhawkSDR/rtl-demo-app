@@ -71,17 +71,17 @@ mkdir -p $RPM_BUILD_ROOT%{_rtl_demo}
 cp -R client/dist $RPM_BUILD_ROOT%{_rtl_client}
 
 mkdir -p $RPM_BUILD_ROOT%{_rtl_app}
-cp -R rtl-demo-app/bin rtl-demo-app/server $RPM_BUILD_ROOT%{_rtl_app}
-cp rtl-demo-app/start.sh          $RPM_BUILD_ROOT%{_rtl_app}
+cp -R bin rtl-demo-app/server $RPM_BUILD_ROOT%{_rtl_app}
+cp start.sh          $RPM_BUILD_ROOT%{_rtl_app}
 
 
 mkdir -p $RPM_BUILD_ROOT%{_supervisor}
-cp rtl-demo-app/deploy/rtl-demo-supervisor.conf $RPM_BUILD_ROOT%{_supervisor}/redhawk-rtl-demo.conf
-cp rtl-demo-app/deploy/rtl-demo-domain-supervisor.conf $RPM_BUILD_ROOT%{_supervisor}/redhawk-rtl-demo-domain.conf
+cp deploy/rtl-demo-supervisor.conf $RPM_BUILD_ROOT%{_supervisor}/redhawk-rtl-demo.conf
+cp deploy/rtl-demo-domain-supervisor.conf $RPM_BUILD_ROOT%{_supervisor}/redhawk-rtl-demo-domain.conf
 
 
 mkdir -p $RPM_BUILD_ROOT%{_nginx}/redhawk-sites
-cp rtl-demo-app/deploy/rtl-demo-nginx.conf $RPM_BUILD_ROOT%{_nginx}/rtl-demo.enabled
+cp deploy/rtl-demo-nginx.conf $RPM_BUILD_ROOT%{_nginx}/rtl-demo.enabled
 
 %clean
 rm -rf %{buildroot}
@@ -110,6 +110,9 @@ rm -rf %{buildroot}
 
 
 %changelog
+* Sat Mar 28 2015 Douglas Pew <douglas.pew@axiosengineering.com> - 1.2.0-1
+- Merged client and server git repo
+
 * Mon Feb 9 2015 Youssef Bagoulla <youssef.bagoulla@axiosengineering.com> - 1.1.0-1
 - Allowing flag for custom npm server.
 
