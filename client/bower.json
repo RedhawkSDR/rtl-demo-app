@@ -1,0 +1,27 @@
+{
+  "name": "rtl-demo-client",
+  "version": "1.2.0",
+  "authors": [
+    "redhawksdr@redhawksdr.org"
+  ],
+  "license": "LGPL",
+  "private": true,
+  "ignore": [
+    "**/.*",
+    "node_modules",
+    "bower_components",
+    "test",
+    "tests"
+  ],
+  "dependencies": {
+    "bootstrap": "~3.2.0",
+    "angular": "~1.2.23",
+    "angular-route": "~1.2.23",
+    "angular-resource": "~1.2.23",
+    "angularjs-toaster": "~0.4.10",
+    "angular-animate": "~1.2.23",
+    "font-awesome": "~4.2.0",
+    "angular-strap": "~2.1.5",
+    "modernizr": "~2.8.3"
+  }
+}

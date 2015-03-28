@@ -1,0 +1,89 @@
+/*
+ * This file is protected by Copyright. Please refer to the COPYRIGHT file
+ * distributed with this source distribution.
+ *
+ * This file is part of REDHAWK rtl-demo-client.
+ *
+ * REDHAWK rtl-demo-client is free software: you can redistribute it and/or modify it
+ * under the terms of the GNU Lesser General Public License as published by the
+ * Free Software Foundation, either version 3 of the License, or (at your
+ * option) any later version.
+ *
+ * REDHAWK rtl-demo-client is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU Lesser General Public License
+ * for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public License
+ * along with this program.  If not, see http://www.gnu.org/licenses/.
+ */
+.rhweb-page-title {
+    padding: 10px;
+    margin: 0;
+}
+
+.rhweb-survey-controls {
+    padding: 5px;
+    margin-bottom: 0px;
+}
+
+.rhweb-display-labels {
+    margin-bottom: 0px;
+    padding: 0;
+    font-weight: bold;
+}
+.rhweb-display-values {
+    padding: 0;
+    margin: 0;
+    font-size: larger;
+}
+
+.rhweb-plot-title {
+    margin-left: 25px;
+    margin-bottom: 0;
+    padding: 0 0 5px 3px;
+    font-weight: bold;
+    /*font-size: small;*/
+}
+.rhweb-plot-container {
+    background-color: #222 !important;
+    border-color: #888;
+}
+.rhweb-plotting-toolbar {
+    padding: 3px;
+    float: none;
+}
+
+.plotting-help-control {
+    width: 200px;
+    font-variant: small-caps;
+    font-weight: bold;
+    padding-top: 3px;
+}
+.plotting-help-function {
+    padding-left: 10px;
+}
+
+.well {
+    background-color: white;
+}
+
+.rhweb-rds-addon {
+    min-width:95px;
+    text-align:right;
+    margin-left: 0px;
+    margin-right: 0px;
+    padding: 5px;
+}
+
+.input-group {
+    width:100%;
+}
+
+.frequency-input {
+    width: 200px;
+}
+
+body {
+    background-color: #eeeeee;
+}

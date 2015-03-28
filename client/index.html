@@ -1,0 +1,97 @@
+<!doctype html>
+<!--
+This file is protected by Copyright. Please refer to the COPYRIGHT file
+distributed with this source distribution.
+
+This file is part of REDHAWK rtl-demo-client.
+
+REDHAWK rtl-demo-client is free software: you can redistribute it and/or modify it under
+the terms of the GNU Lesser General Public License as published by the Free
+Software Foundation, either version 3 of the License, or (at your option) any
+later version.
+
+REDHAWK rtl-demo-client is distributed in the hope that it will be useful, but WITHOUT ANY
+WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR
+A PARTICULAR PURPOSE.  See the GNU Lesser General Public License for more
+details.
+
+You should have received a copy of the GNU Lesser General Public License along
+with this program.  If not, see http://www.gnu.org/licenses/.
+-->
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="icon" type="image/png" href="images/favicon.ico"/>
+
+    <title>REDHAWK RTL Demo</title>
+
+    <!-- build:js lib/vendor.js -->
+    <script src="bower_components/modernizr/modernizr.js"></script>
+    <script src="bower_components/jquery/dist/jquery.js"></script>
+    <script src="bower_components/bootstrap/dist/js/bootstrap.js"></script>
+    <script src="bower_components/angular/angular.js"></script>
+    <script src="bower_components/angular-route/angular-route.js"></script>
+    <script src="bower_components/angular-resource/angular-resource.js"></script>
+    <script src="bower_components/angular-animate/angular-animate.js"></script>
+    <script src="bower_components/angularjs-toaster/toaster.js"></script>
+    <script src="bower_components/angular-strap/dist/angular-strap.js"></script>
+    <script src="bower_components/angular-strap/dist/angular-strap.tpl.js"></script>
+    <!-- endbuild -->
+
+    <!-- build:js js/app.js -->
+    <script src="components/redhawk-audio/redhawk-audio-directives.js"></script>
+    <script src="components/rtl-plots/rtl-plots-directives.js"></script>
+    <script src="components/rtl-plots/sigplot/sigplot-minimized.js"></script>
+    <script src="components/rtl-plots/sigplot/sigplot.plugins-minimized.js"></script>
+    <script src="components/rtl-rest/rtl-rest-directives.js"></script>
+    <script src="components/rtl-rest/rtl-rest-services.js"></script>
+    <script src="components/subscription-socket/subscription-socket-service.js"></script>
+    <script src="app/rtl-demo-app.js"></script>
+    <script src="app/rtl-demo-controllers.js"></script>
+    <!-- endbuild -->
+
+    <!-- build:css lib/vendor.css -->
+    <link rel="stylesheet" href="bower_components/bootstrap/dist/css/bootstrap.css">
+    <link rel="stylesheet" href="bower_components/angularjs-toaster/toaster.css">
+    <link rel="stylesheet" href="bower_components/font-awesome/css/font-awesome.css">
+    <link rel="stylesheet" href="bower_components/angular-motion/dist/angular-motion.css">
+    <!-- endbuild -->
+
+    <!-- build:css css/app.css -->
+    <link rel="stylesheet" href="components/rtl-plots/rtl-plots.css">
+    <link rel="stylesheet" href="css/site.css">
+    <!-- endbuild -->
+  </head>
+  <body ng-app="rtl-demo-app">
+
+    <nav class="navbar navbar-default" role="navigation">
+      <div class="container-fluid">
+        <div class="navbar-header">
+          <button type="button" class="navbar-toggle collapsed" data-toggle="collapse" data-target="#navbar-collapse-1">
+            <span class="sr-only">Toggle navigation</span>
+            <span class="icon-bar"></span>
+            <span class="icon-bar"></span>
+            <span class="icon-bar"></span>
+          </button>
+          <a class="navbar-brand" href="#"><strong><i class="fa fa-signal"></i> RTL DEMO</strong></a>
+        </div>
+        <div class="collapse navbar-collapse" id="navbar-collapse-1">
+          <ul class="nav navbar-right navbar-nav">
+            <li><a href="/admin"><i class="fa fa-medkit"></i> Admin Console</a></li>
+            <li><p class="navbar-text"><device-status></device-status></p></li>
+          </ul>
+        </div>
+      </div>
+    </nav>
+
+    <div id="view" ng-view></div>
+
+    <div class="container">
+      <div id="footer">
+      </div>
+    </div>
+    <toaster-container toaster-options="{'position-class': 'toast-bottom-right'}"></toaster-container>
+  </body>
+</html>

@@ -1,0 +1,55 @@
+<style>
+  .vert-child {
+    display: inline-block;
+    vertical-align: middle;
+    float: none;
+  }
+  .audio-stream-timestamp {
+    text-align: center;
+    font-size: smaller;
+  }
+  .audio-stream > .well {
+    background-color: #bebebe;
+    border-color: #aaaaaa;
+    color: #202020;
+    margin: 0;
+    padding: 7px;
+  }
+</style>
+<audio class="player" autoplay="true">
+  <source class="stream" src="{{url}}" />
+</audio>
+<div class="audio-stream">
+  <div class="well well-sm">
+    <div class="container-fluid audio-stream">
+      <div class="row">
+        <div class="col-md-2 vert-child">
+          <button class="btn btn-xs glyphicon glyphicon-play"
+                  ng-class="{'glyphicon-play': player.paused, 'glyphicon-stop': !player.paused}"
+                  ng-click="togglePlay()">
+          </button>
+        </div>
+        <div class="col-md-4 vert-child">
+
+          <div class="audio-stream-timestamp" ng-if="!player.paused">
+            {{currentTime}}
+          </div>
+          <div class="audio-stream-timestamp" ng-if="player.paused">
+            Stopped
+          </div>
+
+        </div>
+        <div class="col-md-2 vert-child">
+          <button ng-click="mute()"
+             class="btn btn-xs glyphicon"
+             ng-class="{'glyphicon glyphicon-volume-up': !muted, 'glyphicon glyphicon-volume-off': muted}">
+          </button>
+        </div>
+        <div class="col-md-3 col-sm-6 vert-child">
+          <input type="range" min="0" max="100" ng-model="volume">
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
