@@ -27,12 +27,14 @@
 %define bower node_modules/bower/bin/bower
 %define grunt node_modules/grunt-cli/bin/grunt
 
+%define debug_package %{nil}
 
 Prefix:         %{_prefix}
 Name:		redhawk-rtl-demo
 Version:	1.2.0
 Release:	1%{?dist}
 Summary:	A sample REDHAWK web application that uses an RTL device.
+BuildArch:      noarch
 
 License:	LGPL
 BuildRoot:	%(mktemp -ud %{_tmppath}/%{name}-%{version}-%{release}-XXXXXX)
