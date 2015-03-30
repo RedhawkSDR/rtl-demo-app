@@ -71,8 +71,8 @@ mkdir -p $RPM_BUILD_ROOT%{_rtl_demo}
 cp -R client/dist $RPM_BUILD_ROOT%{_rtl_client}
 
 mkdir -p $RPM_BUILD_ROOT%{_rtl_app}
-cp -R bin rtl-demo-app/server $RPM_BUILD_ROOT%{_rtl_app}
-cp start.sh          $RPM_BUILD_ROOT%{_rtl_app}
+cp -R bin server $RPM_BUILD_ROOT%{_rtl_app}
+cp start.sh $RPM_BUILD_ROOT%{_rtl_app}
 
 
 mkdir -p $RPM_BUILD_ROOT%{_supervisor}
