@@ -24,6 +24,7 @@ import time
 import collections
 import difflib
 import logging
+from rtl_app import BadFrequencyException
 
 class RTLAppTest(unittest.TestCase):
 
@@ -180,7 +181,45 @@ class RTLAppTest(unittest.TestCase):
         issues = filter(lambda x: x[1]['similarity'] < x[1]['threshold'], m.items())
         if issues:
             self.fail("Bad fields %s" % issues)
-            
+
+
+    def test_bad_frequency_when_off(self):
+        rtl = self.rtl_app
+        
+        # verify tuner is off
+        self.assertEquals(None, rtl.get_survey()['frequency'])
+        
+        try:
+            # set tuner to bad frequency. Should get error
+            a = rtl.set_survey(frequency=25000000, demod='fm')
+            self.fail("Expected exception, got %s" % a)
+        except BadFrequencyException, e:
+            pass
+        # validate tuner still should be off
+        self.assertEquals(None, rtl.get_survey()['frequency'])
+        
+        a = rtl.stop_survey()
+
+    def test_bad_frequency_when_on(self):
+        rtl = self.rtl_app
+        good_freq = 102000000        
+
+        # set tuner to bad frequency. Should get error
+        a = rtl.set_survey(frequency=good_freq, demod='fm')
+        self.assertEquals(good_freq, rtl.get_survey()['frequency'])
+
+        try:
+            # set tuner to bad frequency. Should get error
+            a = rtl.set_survey(frequency=25000000, demod='fm')
+            self.fail("Expected exception, got %s" % a)
+        except BadFrequencyException, e:
+            pass
+        
+        # validate tuner still should be off
+        self.assertEquals(good_freq, rtl.get_survey()['frequency'])
+
+        a = rtl.stop_survey()
+
 
     def similarity(self, str1, str2):
         return difflib.SequenceMatcher(lambda x: x == ' ', str1, str2).ratio()

@@ -263,11 +263,25 @@ class RTLApp(object):
         if frequency < self.FREQUENCY_RANGE[0] or frequency > self.FREQUENCY_RANGE[1]:
             raise BadFrequencyException(frequency)
 
-        # try to initialize the application
+        # property to restore
+        restore = self._waveform and self._get_manager(timeout=timeout).TuneRequest.frequency
+            
         self._launch_waveform()
         comp = self._get_manager(timeout=timeout)
         comp.TuneRequest.frequency = (frequency / 1000000.0)
-        survey = dict(frequency=int(1000000 * round(comp.TuneRequest.frequency, 4)), demod='fm')
+        actual = 1000000 * round(comp.TuneRequest.frequency, 4)
+        
+        if abs(actual - frequency) > 10000:
+            # bad frequency.  Restore
+            try:
+                if restore:
+                    comp.TuneRequest.frequency = restore
+                else:
+                    self._stop_waveform()
+            except Exception, e:
+                logging.exception("Unable to revert back to frequency %s (Frequency of None means stop waveform)", restore)
+            raise BadFrequencyException(frequency)
+        survey = dict(frequency=actual, demod='fm')
 
         self._post_event('survey', survey)
         return survey
