@@ -264,7 +264,7 @@ class RTLApp(object):
             raise BadFrequencyException(frequency)
 
         # property to restore
-        restore = self._waveform and self._get_manager(timeout=timeout).TuneRequest.frequency
+        kill_waveform = not self._waveform
             
         self._launch_waveform()
         comp = self._get_manager(timeout=timeout)
@@ -273,13 +273,9 @@ class RTLApp(object):
         
         if abs(actual - frequency) > 10000:
             # bad frequency.  Restore
-            try:
-                if restore:
-                    comp.TuneRequest.frequency = restore
-                else:
-                    self._stop_waveform()
-            except Exception, e:
-                logging.exception("Unable to revert back to frequency %s (Frequency of None means stop waveform)", restore)
+            if kill_waveform:
+                self._stop_waveform()
+                self._clear_redhawk()
             raise BadFrequencyException(frequency)
         survey = dict(frequency=actual, demod='fm')
 
