@@ -1,5 +1,26 @@
-#!/bin/sh -e
+#!/bin/sh
 thisdir=`dirname "$0"`
 thisdir=`cd "$thisdir" && pwd`
+venv="$thisdir/../.virtualenv"
+
 export PYTHONPATH=$PYTHONPATH:$OSSIEHOME/lib/python
+
+python -c "import tornado" >/dev/null 2>&1
+if [ $? -ne 0 ] ; then
+   cat <<EOFEOF
+Python tornado module is not installed. To run in a development system:
+
+   $ ./devsetup.sh install
+   $ ./pyenv $0
+
+or
+
+   $ ./devsetup.sh install
+   $ ../.virtualenv/bin/activate
+   $ $0
+
+EOFEOF
+   exit 1
+fi
+
 exec python "$thisdir/../server/server.py" "$@"
