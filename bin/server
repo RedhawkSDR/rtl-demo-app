@@ -3,7 +3,9 @@ thisdir=`dirname "$0"`
 thisdir=`cd "$thisdir" && pwd`
 venv="$thisdir/../.virtualenv"
 
-export PYTHONPATH=$PYTHONPATH:$OSSIEHOME/lib/python
+REDHAWKWEB="${REDHAWKWEB:-/var/redhawk/web}"
+
+export PYTHONPATH=$PYTHONPATH:$OSSIEHOME/lib/python:$REDHAWKWEB/lib64/python2.6/site-packages
 
 python -c "import tornado" >/dev/null 2>&1
 if [ $? -ne 0 ] ; then
