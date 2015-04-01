@@ -35,16 +35,12 @@ from rest import SurveyHandler, DeviceHandler, EventHandler
 from rest import BulkioFloatHandler, BulkioShortHandler, BulkioWavStreamHandler, BulkioWavSocketHandler
 from rtl_app import AsyncRTLApp
 
-# establish static directory from this module as one up from current
-static_dir = os.path.abspath(os.path.join(os.path.dirname(__import__(__name__).__file__), '..', 'static'))
 _BASE_URL = r'/rtl'
 
 
-def get_application(rtl_app, _ioloop=None, debug=False):
+def get_application(rtl_app, _ioloop=None, debug=False, clientpath=None):
 
     my_application = tornado.web.Application([
-        (r"/apps/(.*)/$", IndexHandler),
-        (r"/apps/(.*)", tornado.web.StaticFileHandler, {"path": static_dir}),
         (_BASE_URL + r"/survey", SurveyHandler, dict(rtl_app=rtl_app, ioloop=_ioloop)),
         (_BASE_URL + r"/device", DeviceHandler, dict(rtl_app=rtl_app, ioloop=_ioloop)),
         (_BASE_URL + r"/status", EventHandler, dict(rtl_app=rtl_app, _ioloop=_ioloop)),
@@ -63,18 +59,36 @@ def get_application(rtl_app, _ioloop=None, debug=False):
         (_BASE_URL + r"/output/psk/float", BulkioFloatHandler,
          dict(rtl_app=rtl_app, port_type=rtl_app.PORT_TYPE_PSK_FLOAT, subsize=1024, APE=2, _ioloop=_ioloop)),
         (_BASE_URL + r"/output/psk/short", BulkioShortHandler,
-         dict(rtl_app=rtl_app, port_type=rtl_app.PORT_TYPE_PSK_SHORT, subsize=416, APE=1, _ioloop=_ioloop))
+         dict(rtl_app=rtl_app, port_type=rtl_app.PORT_TYPE_PSK_SHORT, subsize=416, APE=1, _ioloop=_ioloop)),
+        (r"^/$", IndexHandler, dict(path=clientpath)),
+        (r"/(.*)", tornado.web.StaticFileHandler, dict(path=clientpath)),
         ], debug=debug)
 
     return my_application
 
 
 class IndexHandler(tornado.web.RequestHandler):
-    def get(self, path):
-        index = os.path.join(static_dir, path, "index.html")
+
+    def initialize(self, path):
+       print "INIT %s" % path
+       self.root = path
+
+    def get(self, dir=None):
+        print "ROOT=%s, dir=%s" % (self.root, dir)
+        if dir:
+            index = os.path.join(self.root, dir, "index.html")
+        else:
+            index = os.path.join(self.root, "index.html")
         self.render(index)
 
 if __name__ == '__main__':
+
+    # establish static directory from this module as one up from current
+    client_dist = os.path.abspath(os.path.join(os.path.dirname(__import__(__name__).__file__), '..', 'client/dist'))
+    if os.path.isdir(client_dist):
+        default_clientpath=client_dist
+    else:
+        default_clientpath='/var/redhawk/web/rtldemo/client' 
 
     from tornado.options import define, options
     # parse the command line
@@ -84,6 +98,7 @@ if __name__ == '__main__':
     define("domain", default="REDHAWK_DEV", help="Redhawk domain")
     define("port", default="8888", help="port")
     define("debug", default=False, type=bool, help="Enable Tornado debug mode.  Reloads code")
+    define("clientpath", default=default_clientpath, type=str, help="RTL Demo client files")
 
     tornado.options.parse_command_line()
 
@@ -98,7 +113,7 @@ if __name__ == '__main__':
                                     delayfunc=lambda f: time.sleep(options.delay))
     else:
         rtlapp = AsyncRTLApp(options.domain, device)
-    application = get_application(rtlapp, debug=options.debug)
+    application = get_application(rtlapp, debug=options.debug, clientpath=options.clientpath)
     application.listen(options.port)
 
     tornado.ioloop.PeriodicCallback(rtlapp.poll_device_status, 2000).start()
