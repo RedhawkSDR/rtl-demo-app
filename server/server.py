@@ -88,7 +88,7 @@ if __name__ == '__main__':
     if os.path.isdir(client_dist):
         default_clientpath=client_dist
     else:
-        default_clientpath='/var/redhawk/web/rtldemo/client' 
+        default_clientpath='/var/redhawk/web/rtl-demo/client' 
 
     from tornado.options import define, options
     # parse the command line
