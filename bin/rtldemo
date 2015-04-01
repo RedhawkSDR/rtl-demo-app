@@ -40,6 +40,8 @@ while true ; do
    esac
 done
 
+service omniNames start
+service omniEvents start
 "$mydir"/startdomain.sh -d $domain &
-sleep 2 && python -c "import webbrowser; webbrowser.open('http://localhost:$port/')" &
+sleep 5 && python -c "import webbrowser; webbrowser.open('http://localhost:$port/')" &
 "$mydir"/server --domain=$domain --port=$port "$@"
