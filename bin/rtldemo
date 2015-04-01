@@ -1,0 +1,45 @@
+#!/bin/sh -e
+myapp=$(readlink -f "$0")
+mydir=$(dirname "$myapp")
+
+killprogs() {
+  kill -s 1 -- -$$
+} 
+
+trap "killprogs" 0
+
+usage() {
+    cat <<EOFEOF
+Usage: $0 [options] [-- [rtloptions]]
+
+   Options:
+    -p PORT,--port PORT  The port in which to listen.  Default 8080
+    -d,--debug           Enable debug
+    --domain             REDHAWK Domain.  Default RTLDEMO
+    -h,--help            Show this help
+EOFEOF
+}
+
+domain=RTLDEMO
+port=8080
+
+# -- START OF SCRIPT --
+
+# parse command line
+TEMP=`/usr/bin/getopt -o p:dh --long port:,debug,domain:,help -- "$@"`
+[ $? != 0 ] && usage && err "Exiting ..."
+eval set -- "$TEMP"
+while true ; do
+   case "$1" in
+      -h|--help) usage; exit 0;;
+      -d|--debug) debug=true; shift 1 ;;
+      -p|--port) port="$2"; shift 2 ;;
+      --domain) domain="$2"; shift 2;;
+      --) shift 1; break;;
+      *) err "Program err. Args '$@'";;
+   esac
+done
+
+"$mydir"/startdomain.sh -d $domain &
+sleep 2 && python -c "import webbrowser; webbrowser.open('http://localhost:$port/')" &
+"$mydir"/server --domain=$domain --port=$port "$@"
