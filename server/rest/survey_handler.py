@@ -44,6 +44,7 @@ class SurveyHandler(RTLAppHandler):
 
             self.write(dict(success=True,
                             status=dict(frequency=survey['frequency'],
+                                        demod_if=survey['demod_if'],
                                         processing=survey['demod']),
                             availableProcessing=processing))
 
@@ -69,11 +70,13 @@ class SurveyHandler(RTLAppHandler):
 
 
         try:
-            survey = yield self.rtl_app.set_survey(frequency=data['frequency'], 
+            survey = yield self.rtl_app.set_survey(frequency=data['frequency'],
+                                                   demod_if=data.get('demod_if', 0),
                                                    demod=data['processing'])
             logging.info("post CALLBACK")
             self.write(dict(success=True,
                             status=dict(frequency=survey['frequency'],
+                                        demod_if=survey['demod_if'],
                                         processing=survey['demod'])))
         except BadFrequencyException:
             self.set_status(400)
@@ -104,6 +107,7 @@ class SurveyHandler(RTLAppHandler):
             survey = yield self.rtl_app.stop_survey()
             self.write(dict(success=True,
                             status=dict(frequency=survey['frequency'],
+                                        demod_if=survey['demod_if'],
                                         processing=survey['demod'])))
         except Exception:
             logging.exception("Error stopping survey")

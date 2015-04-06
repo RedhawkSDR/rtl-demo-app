@@ -242,14 +242,17 @@ class RTLApp(object):
             }
         '''
         try:
-            return dict(frequency=int(1000000 * round(self._get_manager().TuneRequest.frequency, 4)), demod='fm')
+            # Have to cast to an int because type is not a python int!
+            return dict(frequency=int(1000000 * round(self._get_manager().TuneRequest.frequency, 4)), 
+                        demod_if=int(self._get_tfd().TuningIF),
+                        demod='fm')
         except (IndexError, StandardError):
-            return dict(frequency=None, demod=None)
+            return dict(frequency=None, demod_if=None, demod=None)
 
     def get_available_processing(self):
         return self.SURVEY_DEMOD_LIST
 
-    def set_survey(self, frequency, demod, timeout=2):
+    def set_survey(self, frequency, demod_if, demod, timeout=2):
         '''
              Sets the survey properties.  Returns the new processing values.
 
@@ -267,6 +270,8 @@ class RTLApp(object):
         kill_waveform = not self._waveform
             
         self._launch_waveform()
+        # First try to set the device RF frequency.  If that fails
+        # the ensure survey fails
         comp = self._get_manager(timeout=timeout)
         comp.TuneRequest.frequency = (frequency / 1000000.0)
         actual = 1000000 * round(comp.TuneRequest.frequency, 4)
@@ -277,7 +282,13 @@ class RTLApp(object):
                 self._stop_waveform()
                 self._clear_redhawk()
             raise BadFrequencyException(frequency)
-        survey = dict(frequency=actual, demod='fm')
+
+        # Now try to set the TuneFilterDecimate TuningIF.  That should work
+        tfd = self._get_tfd(timeout=timeout)
+        tfd.TuningIF = demod_if
+
+        # Have to cast to an int because type is not a python int!
+        survey = dict(frequency=actual, demod_if=int(tfd.TuningIF), demod='fm')
 
         self._post_event('survey', survey)
         return survey
@@ -287,7 +298,7 @@ class RTLApp(object):
         self._stop_waveform()
         self._clear_redhawk()
 
-        survey = dict(frequency=None, demod=None)
+        survey = dict(frequency=None, demod_if=None, demod=None)
         self._post_event('survey', survey)
         return survey
 
@@ -442,7 +453,10 @@ class RTLApp(object):
 
     def _get_manager(self, timeout=0):
         return self._get_component('FrontEndController_1')
-        
+
+    def _get_tfd(self, timeout=0):
+        return self._get_component('TuneFilterDecimate_1')
+
     def  _init_psd_listeners(self):
         port = self._get_component('wideband_psd').getPort('psd_dataFloat_out')
         self._bulkio_bridges[RTLApp.PORT_TYPE_WIDEBAND].connectPort(port, AsyncPort.PORT_TYPE_FLOAT)

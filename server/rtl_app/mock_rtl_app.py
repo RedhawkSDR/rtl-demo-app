@@ -66,7 +66,7 @@ class RTLApp(object):
            self.PORT_TYPE_PSK_SHORT%'data': [],
         }
 
-        self._survey = dict(frequency=None, demod=None)
+        self._survey = dict(frequency=None, demod_if=None, demod=None)
         self._device = dict(type='rtl', status='unavailable')
         self._delayfunc = delayfunc
 
@@ -88,7 +88,7 @@ class RTLApp(object):
         return self.SURVEY_DEMOD_LIST
 
     @_delay
-    def set_survey(self, frequency, demod, timeout=5):
+    def set_survey(self, frequency, demod_if, demod, timeout=5):
         '''
              Sets the survey properties.  Returns the new processing values.
 
@@ -102,13 +102,13 @@ class RTLApp(object):
         if frequency < self.FREQUENCY_RANGE[0] or frequency > self.FREQUENCY_RANGE[1]:
             raise BadFrequencyException(frequency)
 
-        self._survey = dict(frequency=int(frequency), demod=demod)
+        self._survey = dict(frequency=int(frequency), demod_if=demod_if, demod=demod)
         self._post_event('survey', self._survey)
         return self._survey
 
     @_delay
     def stop_survey(self):
-        self._survey = dict(frequency=None, demod=None)
+        self._survey = dict(frequency=None, demod_if=None, demod=None)
         self._post_event('survey', self._survey)
         return self._survey
 

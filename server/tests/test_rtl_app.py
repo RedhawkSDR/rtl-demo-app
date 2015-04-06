@@ -41,13 +41,15 @@ class RTLAppTest(unittest.TestCase):
         rtl = self.rtl_app
 
         for x in xrange(8):     
-            a = rtl.set_survey(frequency=101100000, demod='fm')
+            a = rtl.set_survey(frequency=101100000, demod_if=0, demod='fm')
             self.assertEquals(101100000, a['frequency'])
             self.assertEquals('fm', a['demod'])
+            self.assertEquals(0, a['demod_if'])
 
             a = rtl.stop_survey()
             self.assertEquals(None, a['frequency'])
             self.assertEquals(None, a['demod'])
+            self.assertEquals(None, a['demod_if'])
             print "SLEEPING"
             time.sleep(.5)
 
@@ -66,26 +68,29 @@ class RTLAppTest(unittest.TestCase):
         a = rtl.get_survey()
         self.assertEquals(None, a['frequency'])
         self.assertEquals(None, a['demod'])
-        a = rtl.set_survey(frequency=101100000, demod='fm')
+        a = rtl.set_survey(frequency=101100000, demod_if=0, demod='fm')
         self.assertEquals('fm', a['demod'])
+        self.assertEquals(0, a['demod_if'])
         self.assertEquals(101100000, a['frequency'])
         a = rtl.get_survey()
         self.assertEquals('fm', a['demod'])
+        self.assertEquals(0, a['demod_if'])
         self.assertEquals(101100000, a['frequency'])
         try:
-            a = rtl.set_survey(frequency=100, demod='fm')
+            a = rtl.set_survey(frequency=100, demod_if=0, demod='fm')
             self.fail("expected bad frequency error")
         except rtl_app.BadFrequencyException, e:
             self.assertEquals("Bad frequency 100", e.args[0])
 
         try:
-            a = rtl.set_survey(frequency=101100000, demod='nutrino')
+            a = rtl.set_survey(frequency=101100000, demod_if=0, demod='nutrino')
             self.fail("expected bad frequency error")
         except rtl_app.BadDemodException, e:
             self.assertEquals("Bad demodulator 'nutrino'", e.args[0])
 
         a = rtl.stop_survey()
         self.assertEquals(None, a['demod'])
+        self.assertEquals(None, a['demod_if'])
         self.assertEquals(None, a['frequency'])
 
         def nextevent():
@@ -99,10 +104,12 @@ class RTLAppTest(unittest.TestCase):
 
         e = nextevent()['body']
         self.assertEquals('fm', e['demod'])
+        self.assertEquals(0, e['demod_if'])
         self.assertEquals(101100000, e['frequency'])
 
         e = nextevent()['body']
         self.assertEquals(None, e['demod'])
+        self.assertEquals(None, e['demod_if'])
         self.assertEquals(None, e['frequency'])
 
         self.assertEquals(0, len(events))
@@ -130,7 +137,7 @@ class RTLAppTest(unittest.TestCase):
         if sri_packet[0] or data_packets[0]:
             self.fail('Unexpected packets')
 
-        rtl.set_survey(frequency=101100000, demod='fm')
+        rtl.set_survey(frequency=101100000, demod_if=0, demod='fm')
         time.sleep(5)
         if not sri_packet[0]:
             self.fail('Missing SRI packets')
@@ -155,7 +162,7 @@ class RTLAppTest(unittest.TestCase):
             events.append(event)
         rtl.add_event_listener(elisten)
 
-        a = rtl.set_survey(frequency=101100000, demod='fm')
+        a = rtl.set_survey(frequency=101100000, demod_if=0, demod='fm')
         time.sleep(2)
         a = rtl.stop_survey()
 
@@ -191,7 +198,7 @@ class RTLAppTest(unittest.TestCase):
         
         try:
             # set tuner to bad frequency. Should get error
-            a = rtl.set_survey(frequency=25000000, demod='fm')
+            a = rtl.set_survey(frequency=25000000, demod_if=0, demod='fm')
             self.fail("Expected exception, got %s" % a)
         except BadFrequencyException, e:
             pass
@@ -205,12 +212,12 @@ class RTLAppTest(unittest.TestCase):
         good_freq = 102000000        
 
         # set tuner to bad frequency. Should get error
-        a = rtl.set_survey(frequency=good_freq, demod='fm')
+        a = rtl.set_survey(frequency=good_freq, demod_if=0, demod='fm')
         self.assertEquals(good_freq, rtl.get_survey()['frequency'])
 
         try:
             # set tuner to bad frequency. Should get error
-            a = rtl.set_survey(frequency=25000000, demod='fm')
+            a = rtl.set_survey(frequency=25000000, demod_if=0, demod='fm')
             self.fail("Expected exception, got %s" % a)
         except BadFrequencyException, e:
             pass

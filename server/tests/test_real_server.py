@@ -69,11 +69,34 @@ class RealRESTfulTest(AsyncHTTPTestCase):
         app._xx_rtl_app = _rtl_app
         return app
 
+    @tornado.testing.gen_test(timeout=60)
+    def test_survey_post(self, pdata=dict(frequency=88500000, demod_if=0, processing='fm')):
+        http_client = AsyncHTTPClient(self.io_loop)
+        survey_url = self.get_url(server._BASE_URL + '/survey')
+        yield self._app._xx_rtl_app.set_simulation(True)
+        resp = yield http_client.fetch(HTTPRequest(survey_url, 'POST', body=json.dumps(pdata)))
+
+        # values should be identical
+        self.assertEquals(200, resp.code)
+        data = json.loads(resp.body)
+        self.assertTrue(data['success'])
+        self.assertEquals(pdata, data['status'])
+
+        # getting the survey should be equal too
+        resp2 = yield http_client.fetch(survey_url)
+        self.assertEquals(200, resp2.code)
+        data2 = json.loads(resp2.body)
+        self.assertEquals(pdata, data2['status'])
+
+    def test_survey_post_demod_if(self):
+        self.test_survey_post(dict(frequency=101500000, demod_if=500, processing='fm'))
+        self.test_survey_post(dict(frequency=103500000, demod_if=-500, processing='fm'))
+
 
     @tornado.testing.gen_test(timeout=60)
     def test_streaming_psk_float(self, url='/output/psk/float', bytes=2048):
         yield self._app._xx_rtl_app.set_simulation(True)
-        yield self._app._xx_rtl_app.set_survey(101000000, 'fm')
+        yield self._app._xx_rtl_app.set_survey(101000000, 0, 'fm')
         url = self.get_url(server._BASE_URL + url).replace('http', 'ws')
         for k, bridge in self._app._xx_rtl_app._bulkio_bridges.items():
             self.assertEquals(0, len(bridge._data_listeners), 

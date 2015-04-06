@@ -81,7 +81,7 @@ class RESTfulTest(AsyncHTTPTestCase):
         self.assertEquals(None, data['status']['processing'])
         self.assertEquals(['fm'], data['availableProcessing'])
 
-    def test_survey_post(self, pdata=dict(frequency=88500000, processing='fm')):
+    def test_survey_post(self, pdata=dict(frequency=88500000, demod_if=0, processing='fm')):
         # verify survey initial values
         self.test_survey_get()
 
@@ -107,7 +107,7 @@ class RESTfulTest(AsyncHTTPTestCase):
 
     def test_survey_delete(self):
 
-        pdata = dict(frequency=107500000, processing='fm')
+        pdata = dict(frequency=107500000, demod_if=5, processing='fm')
         # run the post tests to set some values
         self.test_survey_post(pdata=pdata)
 
@@ -123,6 +123,7 @@ class RESTfulTest(AsyncHTTPTestCase):
         data = json.loads(response.buffer.getvalue())
         self.assertEquals(True, data['success'])
         self.assertEquals(None, data['status']['frequency'])
+        self.assertEquals(None, data['status']['demod_if'])
         self.assertEquals(None, data['status']['processing'])
 
         # getting the survey should be equal too
@@ -131,6 +132,7 @@ class RESTfulTest(AsyncHTTPTestCase):
         self.assertEquals(200, response.code)
         data = json.loads(response.buffer.getvalue())
         self.assertEquals(None, data['status']['frequency'])
+        self.assertEquals(None, data['status']['demod_if'])
         self.assertEquals(None, data['status']['processing'])
 
     def test_survey_post_bounds_errors(self):
