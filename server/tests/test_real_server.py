@@ -141,6 +141,26 @@ class RealRESTfulTest(AsyncHTTPTestCase):
     def test_streaming_psk_short(self):
         self.test_streaming_psk_float(url='/output/psk/short', bytes=416)
 
+
+    @tornado.testing.gen_test(timeout=60)
+    def test_concurrent_survey(self):
+
+        def tunejson(freq):
+            return json.dumps(dict(frequency=freq, demod_if=0, processing='fm'))
+
+        http_client = AsyncHTTPClient(self.io_loop)
+        survey_url = self.get_url(server._BASE_URL + '/survey')
+        yield self._app._xx_rtl_app.set_simulation(True)
+        invoke = [ http_client.fetch(HTTPRequest(survey_url, 'POST', body=tunejson(99000000 + x * 20000)))
+                                     for x in range(30) ]
+        print invoke
+        resps = yield invoke
+        for r in resps:
+            # values should be identical
+            self.assertEquals(200, r.code)
+            data = json.loads(r.body)
+            self.assertTrue(data['success'])
+
 if __name__ == '__main__':
 
     # FIXME: Make command line arugment to replace rtl_app with mock

@@ -190,6 +190,7 @@ class RTLApp(object):
               Instantiate the RTL Application against the given redhawk domain.
         '''
         self._log = logging.getLogger('RTLApp')
+        self._lock = threading.RLock()
         self._domainname = domainname
         self._frontend = frontend
 
@@ -241,13 +242,14 @@ class RTLApp(object):
                 demod: "fm"
             }
         '''
-        try:
-            # Have to cast to an int because type is not a python int!
-            return dict(frequency=int(1000000 * round(self._get_manager().TuneRequest.frequency, 4)), 
-                        demod_if=int(self._get_tfd().TuningIF),
-                        demod='fm')
-        except (IndexError, StandardError):
-            return dict(frequency=None, demod_if=None, demod=None)
+        with self._lock:
+            try:
+                # Have to cast to an int because type is not a python int!
+                return dict(frequency=int(1000000 * round(self._get_manager().TuneRequest.frequency, 4)),
+                            demod_if=int(self._get_tfd().TuningIF),
+                            demod='fm')
+            except (IndexError, StandardError):
+                return dict(frequency=None, demod_if=None, demod=None)
 
     def get_available_processing(self):
         return self.SURVEY_DEMOD_LIST
@@ -266,41 +268,43 @@ class RTLApp(object):
         if frequency < self.FREQUENCY_RANGE[0] or frequency > self.FREQUENCY_RANGE[1]:
             raise BadFrequencyException(frequency)
 
-        # property to restore
-        kill_waveform = not self._waveform
-            
-        self._launch_waveform()
-        # First try to set the device RF frequency.  If that fails
-        # the ensure survey fails
-        comp = self._get_manager(timeout=timeout)
-        comp.TuneRequest.frequency = (frequency / 1000000.0)
-        actual = 1000000 * round(comp.TuneRequest.frequency, 4)
-        
-        if abs(actual - frequency) > 10000:
-            # bad frequency.  Restore
-            if kill_waveform:
-                self._stop_waveform()
-                self._clear_redhawk()
-            raise BadFrequencyException(frequency)
+        with self._lock:
+            # property to restore
+            kill_waveform = not self._waveform
 
-        # Now try to set the TuneFilterDecimate TuningIF.  That should work
-        tfd = self._get_tfd(timeout=timeout)
-        tfd.TuningIF = demod_if
+            self._launch_waveform()
+            # First try to set the device RF frequency.  If that fails
+            # the ensure survey fails
+            comp = self._get_manager(timeout=timeout)
+            comp.TuneRequest.frequency = (frequency / 1000000.0)
+            actual = 1000000 * round(comp.TuneRequest.frequency, 4)
 
-        # Have to cast to an int because type is not a python int!
-        survey = dict(frequency=actual, demod_if=int(tfd.TuningIF), demod='fm')
+            if abs(actual - frequency) > 10000:
+                # bad frequency.  Restore
+                if kill_waveform:
+                    self._stop_waveform()
+                    self._clear_redhawk()
+                raise BadFrequencyException(frequency)
 
-        self._post_event('survey', survey)
-        return survey
+            # Now try to set the TuneFilterDecimate TuningIF.  That should work
+            tfd = self._get_tfd(timeout=timeout)
+            tfd.TuningIF = demod_if
+
+            # Have to cast to an int because type is not a python int!
+            survey = dict(frequency=actual, demod_if=int(tfd.TuningIF), demod='fm')
+
+            self._post_event('survey', survey)
+            return survey
 
     def stop_survey(self):
         #self._close_psd_listeners()
-        self._stop_waveform()
-        self._clear_redhawk()
+        with self._lock:
+            self._stop_waveform()
+            self._clear_redhawk()
 
-        survey = dict(frequency=None, demod_if=None, demod=None)
-        self._post_event('survey', survey)
-        return survey
+            survey = dict(frequency=None, demod_if=None, demod=None)
+            self._post_event('survey', survey)
+            return survey
 
 
     def get_device(self):
