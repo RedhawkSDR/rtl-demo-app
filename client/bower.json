@@ -18,7 +18,7 @@
     "angular": "~1.2.23",
     "angular-route": "~1.2.23",
     "angular-resource": "~1.2.23",
-    "angularjs-toaster": "~0.4.10",
+    "angular-toastr": "=0.4.0",
     "angular-animate": "~1.2.23",
     "font-awesome": "~4.2.0",
     "angular-strap": "~2.1.5",

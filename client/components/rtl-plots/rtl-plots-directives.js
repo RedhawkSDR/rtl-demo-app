@@ -20,7 +20,12 @@
 /**
  * Created by Rob Cannon on 9/22/14.
  */
-angular.module('rtl-plots', ['SubscriptionSocketService'])
+angular.module('rtl-plots', ['SubscriptionSocketService', 'toastr'])
+    .config(function(toastrConfig) {
+        angular.extend(toastrConfig, {
+            positionClass: 'toast-bottom-right'
+        });
+    })
     .service('plotDataConverter', ['Modernizr', function(Modernizr){
         /*
          Create a map to convert the standard REDHAWK BulkIO Formats
@@ -73,9 +78,48 @@ angular.module('rtl-plots', ['SubscriptionSocketService'])
             element.html('<div class="rtl-plots-error">Plotting is not supported by this browser.</div>');
         }
     }])
-    //Line plot
-    .directive('rtlPlot', ['SubscriptionSocket', 'plotDataConverter', 'plotNotSupportedError',
-        function(SubscriptionSocket, plotDataConverter, plotNotSupportedError){
+    .service('RedhawkNotificationService', [
+        'toastr',
+        function(toastr){
+            var self = this;
+            self.enabled = true;
+
+            self.msg = function(severity, message, subject) {
+                if (this.enabled) {
+                    var title = subject || severity.toUpperCase();
+                    console.log("[" + severity.toUpperCase() + "] :: " + message);
+                    switch (severity) {
+                        case 'error':
+                            toastr.error(message, title);
+                            break;
+                        case 'success':
+                            toastr.success(message, title);
+                            break;
+                        case 'info':
+                        default:
+                            toastr.info(message, title);
+                            break;
+                    }
+                }
+            };
+
+            self.error = function(text, subject) {
+                this.msg("error", text, subject);
+            };
+            self.info = function(text, subject) {
+                this.msg("info", text, subject);
+            };
+            self.success = function(text, subject) {
+                this.msg("success", text, subject);
+            };
+
+            self.enable = function(enable) {
+                this.enabled = enable;
+            };
+        }
+    ])
+    .directive('rtlPlot', ['SubscriptionSocket', 'plotDataConverter', 'plotNotSupportedError', '$interval', 'RedhawkNotificationService',
+        function(SubscriptionSocket, plotDataConverter, plotNotSupportedError, $interval, RedhawkNotificationService){
             return {
                 restrict: 'E',
                 scope: {
@@ -87,7 +131,9 @@ angular.module('rtl-plots', ['SubscriptionSocketService'])
                     useGradient: '=?',
                     cmode: '@?',
                     plotType: '@',
-                    autol: '@'
+                    autol: '@',
+                    tuneContext: '=',
+                    form: "="
                 },
                 template: '<div style="width: {{width}}; height: {{height}};" ></div>',
                 link: function (scope, element, attrs) {
@@ -97,12 +143,34 @@ angular.module('rtl-plots', ['SubscriptionSocketService'])
                     }
                     var plotSocket = SubscriptionSocket.createNew();
 
-                    var RUBBERBOX_ACTION = 'select';
+                    //use one of the following two lines
+                    var RUBBERBOX_ACTION = 'zoom'; //left-click will zoom, ctr-left-click will do drag-tune (if enabled)
+                    //var RUBBERBOX_ACTION = 'select'; //left-click will do drag-tune (if enabled), ctr-left-click will zoom
 
                     var RUBBERBOX_MODE = 'horizontal';
 
+                    var accordionDrag = false;
+
                     if(!angular.isDefined(scope.useGradient))
                         scope.useGradient = true;
+
+                    //wideband tuned frequency
+                    var rf_cf;
+
+                    //narrowband IF
+                    var if_cf = 0;
+
+                    var target_freq;
+
+                    //narrowband bandwidth
+                    var nb_bw = 100e3;
+
+                    //wideband bandwidth
+                    var wb_bw;
+
+                    var MIN_WB_SPECTRUM = 25e6;
+
+                    var MAX_WB_SPECTRUM = 900e6;
 
                     /**
                      * plot rendering mode
@@ -130,18 +198,30 @@ angular.module('rtl-plots', ['SubscriptionSocketService'])
                     //sigplot objects
                     var plot,
                         raster,
-                        plotLayer,
-                        rasterLayer,
-                        plotAccordion, //sigplot plug-in, used here to display vertical line at tuned frequency
-                        rasterAccordion;
+                        activePlot,
+                        activePlotLayer,
+                        accordion //sigplot plug-in, used here to display vertical line at tuned frequency
 
-                    //narrowband bandwidth
-                    var bw = 100000;
+                    var tunedWhileZoomed = false;
 
-                    //wideband bandwidth
-                    var spectrumBw = 2e6;
+                    var TUNE_STEP = 20e3;
 
-                    var tunedFreq; //TODO see if this is still needed
+                    var STEP_DELAY = 300;
+
+                    var BOUNDARY_FACTOR = 0.1;
+
+                    var pan_control = '';
+
+                    var pan;
+
+                    var accordion_pixel_loc;
+
+                    var leftButton, rightButton;
+
+                    var ghostAccordion;
+
+                    //Since freq is on MHz scale, we need some tolerance when comparing click-point to some value
+                    var clickTolerance = 200; //TODO set value automatically as a multiple of xdelta, to work with any data scale
 
                     //settings used when plot is created. Will be overridden from received SRI
                     var defaultSettings = {
@@ -167,10 +247,12 @@ angular.module('rtl-plots', ['SubscriptionSocketService'])
                         legend: false, //don't show legend of traces being plotted
                         all: true, //show all plot data, rather than partial range with pan bars
                         cmode: cmode,
+                        xcnt: 'continuous',
                         rubberbox_action: RUBBERBOX_ACTION,
-                        rubberbox_mode: RUBBERBOX_MODE,
+                        rubberbox_mode: RUBBERBOX_MODE, //horizontal mode not supported when rubberbox_action == 'zoom'
                         colors: {bg: "#222", fg: "#888"}
                     };
+
 
                     if (scope.autol && (scope.plotType === 'line' || scope.plotType === 'dots')) {
                         angular.extend(plotOptions, {'autol': scope.autol});
@@ -196,7 +278,7 @@ angular.module('rtl-plots', ['SubscriptionSocketService'])
 
                     var createPlot = function(options) {
                         options = options || {};
-                        plot = new sigplot.Plot(element[0].firstChild, options);
+                        activePlot = plot = new sigplot.Plot(element[0].firstChild, options);
                         if (scope.url.indexOf('psd/wideband') >= 0) {
                             //mouse listeners used to provide click-tuning and drag-tuning
                             plot.addListener('mdown', plotMDownListener);
@@ -216,22 +298,100 @@ angular.module('rtl-plots', ['SubscriptionSocketService'])
 
                     };
 
+                    var addButtons = function(style) {
+                        var bounds = currentZoomBounds();
+                        var leftButtonPos = {
+                            x: bounds.x1 + 15,
+                            y: bounds.y1 + 15
+                        };
+                        var rightButtonPos = {
+                            x: bounds.x2 - 15,
+                            y: bounds.y1 + 15
+                        };
+                        var buttonSettings = {
+                            position: {x: leftButtonPos.x, y: leftButtonPos.y},
+                            direction: 'left',
+                            id: 'left'
+                        };
+                        if (style) {
+                            buttonSettings.strokeStyle = style;
+                        }
+                        leftButton = new sigplot.ButtonPlugin(buttonSettings);
+                        activePlot.add_plugin(leftButton, activePlotLayer + 3);
+                        leftButton.addListener('selectevt', leftButtonListener);
+                        buttonSettings = {
+                            position: {x: rightButtonPos.x, y: rightButtonPos.y},
+                            direction: 'right',
+                            id: 'right'
+                        };
+                        if (style) {
+                            buttonSettings.strokeStyle = style;
+                        }
+                        rightButton = new sigplot.ButtonPlugin(buttonSettings);
+                        activePlot.add_plugin(rightButton, activePlotLayer + 4);
+                        rightButton.addListener('selectevt', rightButtonListener);
+                    };
+
+                    var leftButtonListener = function(e) {
+                        if (e.id === 'left') {
+                            target_freq = Math.max(rf_cf - wb_bw, MIN_WB_SPECTRUM);
+                            scope.tuneContext.handleTune();
+                        }
+                    };
+
+                    var rightButtonListener = function(e) {
+                        if (e.id === 'right') {
+                            target_freq = Math.min(rf_cf + wb_bw, MAX_WB_SPECTRUM);
+                            scope.tuneContext.handleTune();
+                        }
+                    };
+
+                    var inRectangle = function(rect, x, y) {
+                        return (x >= rect.x  && x <= rect.x + rect.width && y >= rect.y && y <= rect.y + rect.height);
+                    };
+
+                    var updateButtons = function() {
+                        leftButton.setEnabled(rf_cf - wb_bw / 2 >= MIN_WB_SPECTRUM);
+                        rightButton.setEnabled(rf_cf + wb_bw / 2 <= MAX_WB_SPECTRUM);
+                    };
+
+                    var setPlotBounds = function() {
+                        var bounds = currentZoomBounds();
+                        wb_bw = bounds.xmax - bounds.xmin;
+                        console.log("SET WB BW " + wb_bw);
+                    };
 
                     var overlayPlot = function(overrides, options) {
                         options = options || {};
                         var optionsCopy = angular.extend(options, {layerType: sigplot.Layer1D});
-                        plotLayer = plot.overlay_array(null, overrides, options);
+                        activePlotLayer = plot.overlay_array(null, overrides, options);
 
-                        //sigplot plug-in used to draw vertical line at tuned freq
-                        plotAccordion = new sigplot.AccordionPlugin({
-                            draw_center_line: true,
-                            shade_area: false,
-                            draw_edge_lines: false,
-                            direction: "vertical",
-                            edge_line_style: {strokeStyle: "#FF0000"}
-                        });
+                        if (scope.url.indexOf('psd/wideband') >= 0) {
+                            accordion = new sigplot.AccordionPlugin({
+                                draw_center_line: true,
+                                shade_area: true,
+                                draw_edge_lines: true,
+                                direction: "vertical",
+                                edge_line_style: {strokeStyle: "#FF2400"},
+                                prevent_drag: true
+                            });
+                            ghostAccordion = new sigplot.AccordionPlugin({
+                                draw_center_line: true,
+                                shade_area: true,
+                                draw_edge_lines: true,
+                                direction: "vertical",
+                                edge_line_style: {strokeStyle: "#881200"},
+                                center_line_style: {strokeStyle: "#505050"},
+                                fill_style: {opacity: 0.4, fillStyle: 'rgb(0,0,0)'},
+                                prevent_drag: true
+                            });
+                            plot.add_plugin(accordion, activePlotLayer + 1);//plug-ins are drawn in separate layers
+                            ghostAccordion.set_center(-nb_bw);
+                            ghostAccordion.set_width(nb_bw);
+                            plot.add_plugin(ghostAccordion, activePlotLayer + 2)
 
-                        plot.add_plugin(plotAccordion, plotLayer + 1);//plug-ins are drawn in separate layers
+                            addButtons();
+                        }
                     };
 
                     var rasterOptions = {
@@ -254,7 +414,7 @@ angular.module('rtl-plots', ['SubscriptionSocketService'])
 
                     var createRaster = function(options) {
                         options = options || {};
-                        raster = new sigplot.Plot(element[0].firstChild, options);
+                        activePlot = raster = new sigplot.Plot(element[0].firstChild, options);
                         if (scope.url.indexOf('psd/wideband') >= 0) {
                             raster.addListener('mdown', plotMDownListener);
                             raster.addListener('mup', plotMupListener);
@@ -264,17 +424,33 @@ angular.module('rtl-plots', ['SubscriptionSocketService'])
 
                     var overlayRaster = function(overrides, options) {
                         var overridesCopy = angular.copy(overrides);
-                        rasterLayer = raster.overlay_pipe(angular.extend(overridesCopy, {type: 2000, pipe: true, pipesize: 1024 * 1024 * 5}), options);
+                        activePlotLayer = raster.overlay_pipe(angular.extend(overridesCopy, {type: 2000, pipe: true, pipesize: 1024 * 1024 * 5}), options);
 
-                        rasterAccordion = new sigplot.AccordionPlugin({
-                            draw_center_line: false,
-                            shade_area: true,
-                            draw_edge_lines: true,
-                            direction: "vertical",
-                            edge_line_style: {strokeStyle: "#FF0000"}
-                        });
-
-                        raster.add_plugin(rasterAccordion, rasterLayer + 1);
+                        if (scope.url.indexOf('psd/wideband') >= 0) {
+                            accordion = new sigplot.AccordionPlugin({
+                                draw_center_line: false,
+                                shade_area: true,
+                                draw_edge_lines: true,
+                                direction: "vertical",
+                                edge_line_style: {strokeStyle: "#FF2400"},
+                                prevent_drag: true
+                            });
+                            ghostAccordion = new sigplot.AccordionPlugin({
+                                draw_center_line: false,
+                                shade_area: true,
+                                draw_edge_lines: true,
+                                direction: "vertical",
+                                edge_line_style: {strokeStyle: "#881200"},
+                                center_line_style: {strokeStyle: "#505050"},
+                                fill_style: {opacity: 0.4, fillStyle: 'rgb(0,0,0)'},
+                                prevent_drag: true
+                            });
+                            raster.add_plugin(accordion, activePlotLayer + 1);
+                            ghostAccordion.set_center(-nb_bw);
+                            ghostAccordion.set_width(nb_bw);
+                            raster.add_plugin(ghostAccordion, activePlotLayer + 2);
+                            addButtons('rgb(250,250,250');
+                        }
                     };
 
                     var lastMouseDown = {
@@ -282,28 +458,54 @@ angular.module('rtl-plots', ['SubscriptionSocketService'])
                         y: undefined
                     };
 
-                    //mark initial drag point
-                    var plotMDownListener = function(event) {
-                        lastMouseDown.x = event.x;
-                        lastMouseDown.y = event.y;
-                    };
-
-                    //Since freq is on MHz scale, we need some tolerance when comparing click-point to some value
-                    var clickTolerance = 200; //TODO set value automatically as a multiple of xdelta, to work with any data scale
-
-                    //Compare with initial drag-point to get user-specified rectangle
-                    var plotMupListener = function(event) {
-                        //event.which==> 1=left-click, 2=middle-click, 3=right-click
-                        //left-click zooming is built into sigplot. Here we implement right-click drag-tuning
-                        if (Math.abs(event.x - lastMouseDown.x) <= clickTolerance && event.which === 1) {
-                            if (inPlotBounds(event.x, event.y) && !scope.ctrlKeyPressed) {
-                                console.log("Tuned to " + event.x / 1000 + " KHz");
-                                scope.doTune({cf: event.x});
-                            }
-                        } else if (Math.abs(event.x - lastMouseDown.x) >= clickTolerance && dragSelect(event.which)) {
-                            dragTune(event);
+                    var plotBoundary = function(x) {
+                        var bounds = currentZoomBounds();
+                        var rightFastThreshold = bounds.xmax - (bounds.xmax - bounds.xmin) * BOUNDARY_FACTOR;
+                        var rightThreshold = bounds.xmax - (bounds.xmax - bounds.xmin) * BOUNDARY_FACTOR * 2;
+                        var leftFastThreshold = bounds.xmin + (bounds.xmax - bounds.xmin) * BOUNDARY_FACTOR;
+                        var leftThreshold = bounds.xmin + (bounds.xmax - bounds.xmin) * BOUNDARY_FACTOR *2;
+                        if (x < leftFastThreshold) {
+                            return 0;
+                        } else if (x < leftThreshold) {
+                            return 1;
+                        } else if (x > rightThreshold && x <= rightFastThreshold) {
+                            return 2;
+                        } else if (x > rightFastThreshold) {
+                            return 3;
+                        } else {
+                            return 4;
                         }
-                    };
+                    }
+
+                    /**
+                     * Determine if the user is unzooming to get back to the top zoom level, and a tune
+                     * event occurred while zoomed
+                     * @param {Number} button the mouse button that was pressed (1: left, 2L center, 3:right)
+                     * @returns {boolean} true if the plot is being returned to the top zoom level and a tune event
+                     * occurred while zoomed
+                     */
+                    var lastUnzoomAfterTune = function(button) {
+                        if (button === 3) { //right-click
+                            var zoom = zoomLevel();
+                            //stack will have two entries before last unzoom, the current zoomed level and the top level
+                            var retVal = (zoom === 2);
+                            if (retVal) {
+                                retVal = tunedWhileZoomed;
+                                tunedWhileZoomed = false;
+                            }
+                            return retVal;
+                        }
+                        return false;
+                    }
+                    /**
+                     * Return the current zoom level
+                     * @returns {Integer} 1 if the plot is unzoomed all the way, otherwise 1 + the number of zooms
+                     * that have occurred
+                     */
+                    var zoomLevel = function() {
+                        var zoomStack = activePlot._Mx.stk;
+                        return zoomStack.length;
+                    }
 
                     /**
                      * Determine whether a select or  zoom action is being performed with the current drag operation,
@@ -313,20 +515,19 @@ angular.module('rtl-plots', ['SubscriptionSocketService'])
                      * @returns {boolean} true if a select action is being performed, false if a zoom action is being performed.
                      */
                     var dragSelect = function(button) {
-                        var activePlot = (scope.plotType === 'line'? plot: raster);
                         switch (RUBBERBOX_ACTION) {
                             case 'select' :
                                 //true for left-click drag
-                                return button === 1 && activePlot._Mx.warpbox.style !== activePlot._Mx.warpbox.alt_style;
+                                return button === 1 && scope.ctrlKeyPressed;
                             case 'zoom' :
                                 //true for ctrl-left-click drag
-                                return button === 1 && activePlot._Mx.warpbox.style === activePlot._Mx.warpbox.alt_style;
+                                return button === 1 && !scope.ctrlKeyPressed;
                             default:
                                 return false;
                         }
                     };
 
-                    /* Tune to freq value at center of rectangle. In applications where bandwidth is selectable
+                    /** Tune to freq value at center of rectangle. In applications where bandwidth is selectable
                      * it can be set from width of rectangle. Here bandwidth is not selectable because we're dealing with
                      * fixed-bandwidth FM broadcast signals.
                      */
@@ -339,9 +540,48 @@ angular.module('rtl-plots', ['SubscriptionSocketService'])
                                 y2: event.y
                             };
                             lastMouseDown = {x:undefined, y: undefined}; //reset initial drag-point
-                            scope.doTune({cf:(rect.x1 + rect.x2) / 2});
+                            target_freq = (rect.x1 + rect.x2) / 2;
+                            scope.tuneContext.handleTune();
                             console.log("Tuned to sub-band from " + rect.x1 / 1000  + " KHz to " + rect.x2 / 1000 + " KHz");
                         }
+                    };
+
+                    scope.$watch('form.frequency', function(freq) {
+                        target_freq = parseFloat(freq) * 1e6;
+                    });
+
+                    if (scope.tuneContext) {
+                        scope.tuneContext.handleTune = function () {
+                            var bounds = currentZoomBounds();
+                            if (target_freq - nb_bw >= bounds.xmin && target_freq + nb_bw <= bounds.xmax) {
+                                if_cf = target_freq - rf_cf;
+                            } else {
+                                rf_cf = target_freq;
+                                if_cf = 0;
+                            }
+                            scope.doTune({rf_cf: rf_cf, if_cf: if_cf});
+                            showHighlight(rf_cf);
+                            if (pan) {
+                                accordion.set_center(mx.pixel_to_real(activePlot._Mx, accordion_pixel_loc.x, accordion_pixel_loc.y).x);
+                            }
+                            if (leftButton && rightButton) {
+                                updateButtons();
+                            }
+                        };
+                    }
+
+                    /**
+                     * Determine whether the specified x value is within the bounds of the plot accordion
+                     * @param x the Real World Coordinate (RWC) X value
+                     * @returns {boolean} true if x is within the bounds of the plot accordion
+                     */
+                    var inAccordionBounds = function(x) {
+                        if (accordion) {
+                            var min = accordion.get_center() - nb_bw / 2;
+                            var max = accordion.get_center() + nb_bw / 2;
+                            return x >= min && x <= max;
+                        }
+                        return false;
                     };
 
                     /**
@@ -349,18 +589,146 @@ angular.module('rtl-plots', ['SubscriptionSocketService'])
                      * Here we detect whether clicking on actual plot or surrounding area.
                      */
                     var inPlotBounds = function(x, y) {
-                        var activePlot = (scope.plotType === 'line'? plot: raster);
-                        //zoom stack remembers min/max values at each zoom level, with current zoom values at end of stack
-                        var zoomStack = activePlot._Mx.stk[activePlot._Mx.stk.length - 1];
-                        var xmin = zoomStack.xmin;
-                        var xmax = zoomStack.xmax;
-                        var ymin = zoomStack.ymin;
-                        var ymax = zoomStack.ymax;
-                        // when clicking on any x position > xmax, x will be set to xmax. Same for y values
+                        var bounds = currentZoomBounds();
+                        var xmin = bounds.xmin;
+                        var xmax = bounds.xmax;
+                        var ymin = bounds.ymin;
+                        var ymax = bounds.ymax;
+                        // Use >= and <= because when clicking on any x position > xmax, x will be set to xmax. Same for y values
                         if (x >= xmax || x <= xmin || y >= ymax || y <= ymin) {
                             return false;
                         }
                         return true;
+                    };
+
+                    var currentZoomBounds = function() {
+                        //zoom stack remembers min/max values at each zoom level, with current zoom values at end of stack
+                        return activePlot._Mx.stk[activePlot._Mx.stk.length - 1];
+                    }
+
+                    //mark initial drag point
+                    var plotMDownListener = function(event) {
+                        if (inAccordionBounds(event.x)) {
+                            accordionDrag = true;
+                            //Don't draw the warpbox while dragging the accordion
+                            activePlot.change_settings({rubberbox_action: ""});
+                            activePlot.addListener('mmove', accordionMoveListener);
+                            ghostAccordion.set_center(event.x);
+                            return;
+                        }
+                        lastMouseDown.x = event.x;
+                        lastMouseDown.y = event.y;
+                    };
+
+                    //Compare with initial drag-point to get user-specified rectangle
+                    var plotMupListener = function(event) {
+                        if (scope.url.indexOf('psd/wideband') >= 0) {
+                            var lBounds = leftButton.bounds();
+                            var rBounds = rightButton.bounds();
+                            if (inRectangle(lBounds, event.xpos, event.ypos) || inRectangle(rBounds, event.xpos, event.ypos)) {
+                                console.log("CLICKED on BUTTON");
+                                return;
+                            }
+                            ghostAccordion.set_center(-nb_bw);
+                            if (accordionDrag) {
+                                stopPan();
+                                target_freq = event.x;
+                                scope.tuneContext.handleTune();
+                                accordionDrag = false;
+                                activePlot.removeListener('mmove', accordionMoveListener);
+                                activePlot.change_settings({rubberbox_action: RUBBERBOX_ACTION});
+                                return;
+                            }
+                        }
+
+                        //event.which==> 1=left-click, 2=middle-click, 3=right-click
+                        /*tune if left-click or if unzooming to top level after tuning while zoomed.*/
+                        if (Math.abs(event.x - lastMouseDown.x) <= clickTolerance && (event.which === 1 || lastUnzoomAfterTune(event.which))) {
+                            if (inPlotBounds(event.x, event.y) && !scope.ctrlKeyPressed) {
+                                console.log("Tuned to " + event.x / 1000 + " KHz");
+                                if (zoomLevel() > 2) {
+                                    tunedWhileZoomed = true;
+                                }
+                                target_freq = event.x;
+                                if (event.which === 3) {
+                                    //re-tune to the value specified while zoomed, to re-scale the plot
+                                    target_freq = rf_cf + if_cf;
+                                    activePlot.refresh();
+                                }
+                                if (scope.tuneContext) {
+                                    scope.tuneContext.handleTune();
+                                }
+                            }
+                        } else if (Math.abs(event.x - lastMouseDown.x) >= clickTolerance && dragSelect(event.which)) {
+                            //Drag tune disabled for this application because it doesn't make sense with fixed bandwidth signals
+                            //dragTune(event);
+                        }
+                    };
+
+                    var accordionMoveListener = function(event) {
+                        accordion.set_center(event.x);
+                        var boundaryProximity = plotBoundary(event.x);
+                        accordion_pixel_loc = mx.real_to_pixel(activePlot._Mx, event.x, event.y);
+                        switch (boundaryProximity) {
+                            case 0:
+                                pan_control = "left_fast";
+                                doPan();
+                                break;
+                            case 1:
+                                pan_control = "left";
+                                doPan();
+                                break;
+                            case 2:
+                                pan_control = "right";
+                                doPan();
+                                break;
+                            case 3:
+                                pan_control = "right_fast";
+                                doPan();
+                                break;
+                            default:
+                                pan_control = '';
+                                stopPan();
+                        }
+                    };
+
+                    var doPan = function() {
+                        if (pan) {
+                            return;
+                        }
+                        RedhawkNotificationService.enable(false);
+                        pan = $interval(function() {
+                                if (!pan) {
+                                    return;
+                                }
+                                if (pan_control === 'left') {
+                                    target_freq-= TUNE_STEP;
+                                    rf_cf = target_freq;
+                                } else if (pan_control === 'left_fast') {
+                                    target_freq-= TUNE_STEP * 10;
+                                    rf_cf = target_freq;
+                                } else if (pan_control === 'right') {
+                                    target_freq+= TUNE_STEP;
+                                    rf_cf = target_freq;
+                                } else if (pan_control === 'right_fast') {
+                                    target_freq+= TUNE_STEP * 10;
+                                    rf_cf = target_freq;
+                                }
+                                if_cf = 0;
+                                scope.tuneContext.handleTune();
+                            },
+                            STEP_DELAY);
+
+                    };
+
+                    var stopPan = function() {
+                        if (pan) {
+                            $interval.cancel(pan);
+                            pan = undefined;
+                            RedhawkNotificationService.enable(true);
+                            accordion_pixel_loc = undefined;
+                            ghostAccordion.set_center(-nb_bw);
+                        }
                     };
 
                     /**
@@ -368,29 +736,31 @@ angular.module('rtl-plots', ['SubscriptionSocketService'])
                      * for data in a specified x-value range
                      */
                     var showHighlight = function (cf) {
+                        if (pan) {
+                            return;
+                        }
                         if (scope.url.indexOf('psd/narrowband') >= 0) {
                             cf = 0;//show baseband freq for narrowband plot, not RF
-                            bw = 100e3//TODO get value from TuneFilterDecimate component
+                        } else {
+                            cf+= if_cf;
                         }
-                        if (plot && cf !== undefined && plot.get_layer(plotLayer)) {
+                        if (activePlot && cf !== undefined && activePlot.get_layer(activePlotLayer)) {
                             if (scope.url.indexOf('psd/wideband') >= 0 || scope.url.indexOf('psd/narrowband') >= 0) {
-                                plot.get_layer(plotLayer).remove_highlight('subBand');
-                                plot.get_layer(plotLayer).add_highlight(
-                                    {
-                                        xstart: cf - bw / 2,
-                                        xend: cf + bw / 2,
-                                        color: 'rgba(255,50,50,1)',
-                                        id: 'subBand'
-                                    }
-                                );
-                                plotAccordion.set_center(cf);
-                                //width not visible since we're not drawing edge-lines, but still required
-                                plotAccordion.set_width(bw);
+                                if ( scope.url.indexOf('psd/narrowband') >= 0) {
+                                    activePlot.get_layer(activePlotLayer).remove_highlight('subBand');
+                                    activePlot.get_layer(activePlotLayer).add_highlight(
+                                        {
+                                            xstart: cf - nb_bw / 2,
+                                            xend: cf + nb_bw / 2,
+                                            color: 'rgba(255,50,50,1)',
+                                            id: 'subBand'
+                                        }
+                                    );
+                                } else if (accordion) {
+                                    accordion.set_center(cf);
+                                    accordion.set_width(nb_bw);
+                                }
                             }
-                        }
-                        if (rasterAccordion && cf !== undefined) {
-                            rasterAccordion.set_center(cf);
-                            rasterAccordion.set_width(bw);
                         }
 
                     };
@@ -409,11 +779,11 @@ angular.module('rtl-plots', ['SubscriptionSocketService'])
                      */
                     var updatePlotSettings = function(data) {
                         var isDirty = false;
-                        var cf = data.keywords.CHAN_RF;
+                        rf_cf = data.keywords.CHAN_RF;
                         var xstart = data.xstart;
                         if (Math.abs(lastXStart - xstart) > 0) {
                             lastXStart = xstart;
-                            showHighlight(cf);
+                            showHighlight(rf_cf);
                             isDirty = true;
                         }
 
@@ -488,7 +858,7 @@ angular.module('rtl-plots', ['SubscriptionSocketService'])
                                 isDirty = true;
                             }
 
-                            showHighlight(cf);
+                            showHighlight(rf_cf);
                         }
 
                         if(isDirty) {
@@ -552,39 +922,47 @@ angular.module('rtl-plots', ['SubscriptionSocketService'])
                         //assume single frame per handler invocation
                         var array = dataConverter(data);
                         lastDataSize = array.length;
-                        if (plot || raster) {
+                        if (activePlot) {
                             reloadPlots(array);
                         }
                     };
 
                     var reloadPlots = function(data) {
 
-                        if (scope.plotType === 'line' && plot && plotLayer === undefined) {
+                        if (scope.plotType === 'line' && activePlotLayer === undefined) {
                             overlayPlot(scope.plotSettings);
-                        } else if (scope.plotType === 'dots' && plotLayer === undefined) {
+                            if (scope.tuneContext) {
+                                setPlotBounds();
+                                scope.tuneContext.handleTune();
+                            }
+                        } else if (scope.plotType === 'dots' && activePlotLayer === undefined) {
                             overlayPlot(scope.plotSettings, angular.extend(plotOptions, {line: 0, radius: 1, symbol: 1}));
-                        } else if (scope.plotType === 'raster' && rasterLayer === undefined) {
+                        } else if (scope.plotType === 'raster' && activePlotLayer === undefined) {
                             angular.extend(scope.rasterSettings, {'yunits': 1});
                             overlayRaster(scope.rasterSettings, rasterOptions);
+                            if (scope.tuneContext) {
+                                setPlotBounds();
+                                scope.tuneContext.handleTune();
+                            }
                         }
 
                         if (reloadSri) {
-                            if (plot && plotLayer !== undefined) {
-                                plot.reload(plotLayer, data, scope.plotSettings);
+                            if (plot && activePlotLayer !== undefined) {
+                                plot.reload(activePlotLayer, data, scope.plotSettings);
                                 plot.refresh();
                             }
-                            if (raster && rasterLayer !== undefined) {
-                                raster.push(rasterLayer, data, scope.rasterSettings);
+                            if (raster && activePlotLayer !== undefined) {
+                                raster.push(activePlotLayer, data, angular.copy(angular.extend(scope.rasterSettings)));
                                 raster.refresh();
                             }
                             reloadSri = false;
                         } else {
-                            if (plot && plotLayer !== undefined) {
-                                plot.reload(plotLayer, data);
+                            if (plot && activePlotLayer !== undefined) {
+                                plot.reload(activePlotLayer, data);
                                 plot.refresh();
                             }
-                            if (raster && rasterLayer !== undefined) {
-                                raster.push(rasterLayer, data);
+                            if (raster && activePlotLayer !== undefined) {
+                                raster.push(activePlotLayer, data);
                                 raster.refresh();
                             }
                         }

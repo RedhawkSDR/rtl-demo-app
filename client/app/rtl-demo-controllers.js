@@ -38,11 +38,19 @@ angular.module('rtl-demo-controllers', ['rtl-rest'])
                 processing: undefined
             };
 
-            $scope.defaultFrequency = 104.5;
+            $scope.tuneContext = {};
 
-            $scope.task = function(){
-                $scope.survey.task($scope.form.frequency? $scope.form.frequency : $scope.defaultFrequency, $scope.form['processing']);
+            $scope.task = function(obj){
+                var if_cf = obj ? obj.if_cf : undefined;
+                var rf_cf = undefined;
+                if (!obj || !obj.rf_cf) {
+                    rf_cf = $scope.form.frequency;
+                } else {
+                    rf_cf = obj.rf_cf;
+                }
+                $scope.survey.task(rf_cf, if_cf, $scope.form['processing']);
             };
+
             $scope.halt = function(){
                 $scope.survey.halt();
             };
@@ -56,9 +64,16 @@ angular.module('rtl-demo-controllers', ['rtl-rest'])
                 $scope.task();
             }
 
-            $scope.doTune = function(cf) {
-                $scope.form.frequency = cf / 1e6;
-                $scope.task();
+            $scope.doTune = function(rf_cf, if_cf) {
+                $scope.form.frequency = ((rf_cf ? rf_cf : 0) + (if_cf ? if_cf : 0))/ 1e6;
+                var entity = {};
+                if (rf_cf) {
+                    entity.rf_cf = rf_cf / 1e6;
+                }
+                if (if_cf) {
+                    entity.if_cf = if_cf / 1e6;
+                }
+                $scope.task(entity);
             };
 
             $scope.widebandMode = "line";

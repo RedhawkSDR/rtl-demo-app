@@ -23,7 +23,7 @@
  *
  * Created by rxc on 8/29/14.
  **/
-angular.module('rtl-rest', ['ngResource', 'toaster', 'ngAnimate', 'SubscriptionSocketService'])
+angular.module('rtl-rest', ['ngResource', 'ngAnimate', 'SubscriptionSocketService'])
     .service('RTLRest', ['$resource',
         function($resource){
             var self = this;
@@ -41,9 +41,10 @@ angular.module('rtl-rest', ['ngResource', 'toaster', 'ngAnimate', 'SubscriptionS
             });
         }
     ])
-    .factory('rtl', ['RTLRest', 'toaster', 'SubscriptionSocket',
-        function(RTLRest, toastr, SubscriptionSocket) {
+    .factory('rtl', ['RTLRest', 'RedhawkNotificationService', 'SubscriptionSocket',
+        function(RTLRest, RedhawkNotificationService, SubscriptionSocket) {
 
+            var notify = RedhawkNotificationService;
             var log = {
                 info:  function(txt) { console.log('INFO:  '+txt); },
                 warn:  function(txt) { console.log('WARN:  '+txt); },
@@ -56,6 +57,7 @@ angular.module('rtl-rest', ['ngResource', 'toaster', 'ngAnimate', 'SubscriptionS
             var Survey = function() {
                 var self = this;
                 var frequencyConversion = 1000 * 1000;
+                var defaultFrequency = 100.1;
 
                 self._update = function(data) {
                     if(data.hasOwnProperty('frequency') && data['frequency']){
@@ -78,23 +80,37 @@ angular.module('rtl-rest', ['ngResource', 'toaster', 'ngAnimate', 'SubscriptionS
                 };
                 self._reload = function(){ self._load(); };
 
-                self.task = function(frequency, processing) {
-                    return RTLRest.survey.task({},
-                        {
-                            frequency: parseFloat(frequency) * frequencyConversion,
-                            processing: processing
-                        }, function(data) {
+                self.task = function(rf_cf, if_cf, processing) {
+                    var entity = {};
+                    entity.processing = processing;
+                    if (rf_cf) {
+                        entity.frequency = parseFloat(rf_cf) * frequencyConversion;
+                    } else {
+                        entity.frequency = defaultFrequency * frequencyConversion;
+                    }
+                    if (if_cf) {
+                        entity.demod_if = parseFloat(if_cf) * frequencyConversion;
+                    } else {
+                        entity.demod_if = parseFloat(0);
+                    }
+                    console.log("REST CALL with entity " + JSON.stringify(entity));
+                    return RTLRest.survey.task(
+                        {},
+                        entity,
+                        function(data) {
                             if(data['success']) {
                                 self._update(data['status']);
-                                toastr.pop('success', 'Task', 'Successfully tasked to '+frequency+' and '+processing+'.');
+                                var tuned_freq = data.status.frequency  + data.status.demod_if / 1e6;
+                                //var tuned_freq = (entity.frequency ? entity.frequency : 0) +  (entity.demod_if ? entity.demod_if : 0);
+                                notify.success('Successfully tasked to '+ tuned_freq +' MHz and '+processing+'.', 'Task');
                                 log.info(JSON.stringify(data));
                             } else {
                                 log.error(data['error']);
-                                toastr.pop('error', 'Task', data['error']);
+                                notify.error(data['error'], 'Task');
                             }
                         }, function(resp) {
                             log.error(resp['data']['error']);
-                            toastr.pop('error', 'Task', resp['data']['error']);
+                            notify.error(resp['data']['error'], 'Task');
                         }
                     );
                 };
@@ -104,11 +120,11 @@ angular.module('rtl-rest', ['ngResource', 'toaster', 'ngAnimate', 'SubscriptionS
                         function(data) {
                             if(data['success']) {
                                 log.info(JSON.stringify(data));
-                                toastr.pop('success', 'Halt', 'Successfully halted processing.');
+                                notify.success('Successfully halted processing', 'Halt');
                                 self._reload();
                             } else {
                                 log.error(data['error']);
-                                toastr.pop('error', 'Halt', data['error']);
+                                notigy.error(data['error'], 'Halt');
                             }
                         }
                     );
@@ -132,7 +148,7 @@ angular.module('rtl-rest', ['ngResource', 'toaster', 'ngAnimate', 'SubscriptionS
                         },
                         function(data) {
                             log.error(data['error']+" : "+data['message']);
-                            toastr.pop('error', data['error'], data['message']);
+                            notify.error(data['message'], data['error']);
                         }
                     );
                 };
@@ -141,9 +157,9 @@ angular.module('rtl-rest', ['ngResource', 'toaster', 'ngAnimate', 'SubscriptionS
                     if('status' in data && data['status'] != self.status) {
                         var name = data['type'].toUpperCase();
                         if(data['status'] == 'ready')
-                            toastr.pop('success', 'Device', name + " is ready.");
+                            notify.success(name + " is ready.", 'Device');
                         else if(data['status'] == 'unavailable')
-                            toastr.pop('error', 'Device', name + " is unavailable.");
+                            notify.error(name + " is unavailable", 'Device');
                         else
                             log.warn("Unknown device status of '"+data['status']+" for "+name);
                     }
@@ -170,7 +186,7 @@ angular.module('rtl-rest', ['ngResource', 'toaster', 'ngAnimate', 'SubscriptionS
                 var self = this;
                 self._update = function(rds) {
                     if (rds) {
-                       angular.extend(self, rds);
+                        angular.extend(self, rds);
                     }
                 }
             }

@@ -40,7 +40,7 @@
                                         ng-options="p for p in processors">
                                 </select>
                             </div>
-                            <button type="submit" class="btn btn-success" ng-click="task()" ng-show="running">Tune</button>
+                            <button type="submit" class="btn btn-success" ng-click="tuneContext.handleTune()" ng-show="running">Tune</button>
                             <button class="btn btn-success" ng-show="!running" ng-click="task()">Start</button>
                             <button class="btn btn-danger" ng-show="running" ng-click="halt()">Halt</button>
                         </form>
@@ -136,7 +136,9 @@
 
             <div class="well well-sm text-center rhweb-plot-container">
                 <div ng-if="widebandMode == 'line'">
-                    <rtl-plot do-tune="doTune(cf)"
+                    <rtl-plot do-tune="doTune(rf_cf, if_cf)"
+                              tune-context="tuneContext"
+                              form="form"
                               width="auto" height="300px"
                               type="float"
                               url="/rtl/output/psd/wideband"
@@ -145,12 +147,14 @@
                     </rtl-plot>
                 </div>
                 <div ng-if="widebandMode == 'raster'">
-                    <rtl-plot do-tune="doTune(cf)"
-                                width="auto" height="300px"
-                                type="float"
-                                url="/rtl/output/psd/wideband"
-                                cmode="D2"
-                                plot-type="raster">
+                    <rtl-plot do-tune="doTune(rf_cf, if_cf)"
+                              tune-context="tuneContext"
+                              form="form"
+                              width="auto" height="300px"
+                              type="float"
+                              url="/rtl/output/psd/wideband"
+                              cmode="D2"
+                              plot-type="raster">
                     </rtl-plot>
                 </div>
             </div>
@@ -173,7 +177,7 @@
             <div class="well well-sm text-center rhweb-plot-container">
                 <div ng-if="detailPlotMode == 'narrowband'">
 
-                    <rtl-plot do-tune="doTune(cf)"
+                    <rtl-plot do-tune="doTune(rf_cf, if_cf)"
                               width="auto" height="300px"
                               type="float"
                               url="/rtl/output/psd/narrowband"
@@ -184,7 +188,7 @@
                 </div>
                 <div ng-if="detailPlotMode == 'demod_freq'">
 
-                    <rtl-plot do-tune="doTune(cf)"
+                    <rtl-plot do-tune="doTune(rf_cf, if_cf)"
                               width="auto" height="300px"
                               type="float"
                               url="/rtl/output/psd/fm"
@@ -206,7 +210,7 @@
                 </div>
                 <div ng-if="detailPlotMode == 'demod_bit_raster'">
 
-                    <rtl-plot do-tune="doTune(cf)"
+                    <rtl-plot do-tune="doTune(rf_cf, if_cf)"
                               width="auto" height="300px"
                               type="short"
                               url="/rtl/output/psk/short"
@@ -217,7 +221,7 @@
                 </div>
                 <div ng-if="detailPlotMode == 'demod_time'">
 
-                    <rtl-plot do-tune="doTune(cf)"
+                    <rtl-plot do-tune="doTune(rf_cf, if_cf)"
                               width="auto" height="300px"
                               type="float"
                               cmode="RE"
