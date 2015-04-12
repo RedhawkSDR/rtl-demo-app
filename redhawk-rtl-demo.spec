@@ -61,11 +61,6 @@ BuildRequires:  git
 %build
 
 %install
-cd client
-%{?npm_registry: npm set registry %{npm_registry} }
-npm install
-%{grunt} dist
-cd -
 
 mkdir -p $RPM_BUILD_ROOT%{_rtl_demo}
 cp -R client/dist $RPM_BUILD_ROOT%{_rtl_client}
