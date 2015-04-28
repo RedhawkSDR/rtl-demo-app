@@ -26,6 +26,10 @@ angular.module('rtl-plots', ['SubscriptionSocketService', 'toastr'])
             positionClass: 'toast-bottom-right'
         });
     })
+    /*
+     * This service converts byte arrays into an array containing instances of
+     * a specified TypedArray view.
+     */
     .service('plotDataConverter', ['Modernizr', function(Modernizr){
         /*
          Create a map to convert the standard REDHAWK BulkIO Formats
@@ -698,7 +702,7 @@ angular.module('rtl-plots', ['SubscriptionSocketService', 'toastr'])
                     var doPan = function(event) {
                         accordion.set_mode('relative');
                         var bounds = currentZoomBounds();
-                        accordion.set_center(event.xpos / (bounds.x2));
+                        accordion.set_center((event.xpos - bounds.x1) / (bounds.x2 - bounds.x1));
                         accordion.set_width(nb_bw / (currentZoomBounds().xmax - currentZoomBounds().xmin));
                         if (pan) {
                             return;
