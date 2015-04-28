@@ -168,10 +168,6 @@ angular.module('rtl-plots', ['SubscriptionSocketService', 'toastr'])
                     //wideband bandwidth
                     var wb_bw;
 
-                    var MIN_WB_SPECTRUM = 25e6;
-
-                    var MAX_WB_SPECTRUM = 900e6;
-
                     /**
                      * plot rendering mode
                      *   "IN" = Index, "AB" = Abscissa,
@@ -208,13 +204,9 @@ angular.module('rtl-plots', ['SubscriptionSocketService', 'toastr'])
 
                     var STEP_DELAY = 300;
 
-                    var BOUNDARY_FACTOR = 0.1;
-
                     var pan_control = '';
 
                     var pan;
-
-                    var accordion_pixel_loc;
 
                     var leftButton, rightButton;
 
@@ -283,6 +275,18 @@ angular.module('rtl-plots', ['SubscriptionSocketService', 'toastr'])
                             //mouse listeners used to provide click-tuning and drag-tuning
                             plot.addListener('mdown', plotMDownListener);
                             plot.addListener('mup', plotMupListener);
+                            document.onmouseup = function(e) {
+                                if (pan) {
+                                    var bounds = currentZoomBounds();
+                                    if (event.x <= bounds.xmin || event.x >= bounds.xmax) {
+                                        stopPan();
+                                        ghostAccordion.set_visible(false);
+                                        accordionDrag = false;
+                                        activePlot.removeListener('mmove', accordionMoveListener);
+                                        activePlot.change_settings({rubberbox_action: RUBBERBOX_ACTION});
+                                    }
+                                }
+                            };
                         }
 
                         if(scope.useGradient) {
@@ -334,14 +338,14 @@ angular.module('rtl-plots', ['SubscriptionSocketService', 'toastr'])
 
                     var leftButtonListener = function(e) {
                         if (e.id === 'left') {
-                            target_freq = Math.max(rf_cf - wb_bw, MIN_WB_SPECTRUM);
+                            target_freq = Math.max(rf_cf - wb_bw, scope.tuneContext.minWidebandSpectrum + (nb_bw / 2));
                             scope.tuneContext.handleTune();
                         }
                     };
 
                     var rightButtonListener = function(e) {
                         if (e.id === 'right') {
-                            target_freq = Math.min(rf_cf + wb_bw, MAX_WB_SPECTRUM);
+                            target_freq = Math.min(rf_cf + wb_bw, scope.tuneContext.maxWidebandSpectrum - (nb_bw / 2));
                             scope.tuneContext.handleTune();
                         }
                     };
@@ -351,8 +355,8 @@ angular.module('rtl-plots', ['SubscriptionSocketService', 'toastr'])
                     };
 
                     var updateButtons = function() {
-                        leftButton.setEnabled(rf_cf - wb_bw / 2 >= MIN_WB_SPECTRUM);
-                        rightButton.setEnabled(rf_cf + wb_bw / 2 <= MAX_WB_SPECTRUM);
+                        leftButton.setEnabled(rf_cf - wb_bw / 2 >= scope.tuneContext.minWidebandSpectrum);
+                        rightButton.setEnabled(rf_cf + wb_bw / 2 <= scope.tuneContext.maxWidebandSpectrum);
                     };
 
                     var setPlotBounds = function() {
@@ -386,9 +390,9 @@ angular.module('rtl-plots', ['SubscriptionSocketService', 'toastr'])
                                 prevent_drag: true
                             });
                             plot.add_plugin(accordion, activePlotLayer + 1);//plug-ins are drawn in separate layers
-                            ghostAccordion.set_center(-nb_bw);
+                            plot.add_plugin(ghostAccordion, activePlotLayer + 2);
                             ghostAccordion.set_width(nb_bw);
-                            plot.add_plugin(ghostAccordion, activePlotLayer + 2)
+                            ghostAccordion.set_visible(false);
 
                             addButtons();
                         }
@@ -446,9 +450,9 @@ angular.module('rtl-plots', ['SubscriptionSocketService', 'toastr'])
                                 prevent_drag: true
                             });
                             raster.add_plugin(accordion, activePlotLayer + 1);
-                            ghostAccordion.set_center(-nb_bw);
-                            ghostAccordion.set_width(nb_bw);
                             raster.add_plugin(ghostAccordion, activePlotLayer + 2);
+                            ghostAccordion.set_visible(false);
+                            ghostAccordion.set_width(nb_bw);
                             addButtons('rgb(250,250,250');
                         }
                     };
@@ -458,19 +462,15 @@ angular.module('rtl-plots', ['SubscriptionSocketService', 'toastr'])
                         y: undefined
                     };
 
-                    var plotBoundary = function(x) {
+                    var plotBoundary = function(event) {
                         var bounds = currentZoomBounds();
-                        var rightFastThreshold = bounds.xmax - (bounds.xmax - bounds.xmin) * BOUNDARY_FACTOR;
-                        var rightThreshold = bounds.xmax - (bounds.xmax - bounds.xmin) * BOUNDARY_FACTOR * 2;
-                        var leftFastThreshold = bounds.xmin + (bounds.xmax - bounds.xmin) * BOUNDARY_FACTOR;
-                        var leftThreshold = bounds.xmin + (bounds.xmax - bounds.xmin) * BOUNDARY_FACTOR *2;
-                        if (x < leftFastThreshold) {
+                        if (event.x <= bounds.xmin) {
                             return 0;
-                        } else if (x < leftThreshold) {
+                        } else if (event.x - (nb_bw / 2) <= bounds.xmin) {
                             return 1;
-                        } else if (x > rightThreshold && x <= rightFastThreshold) {
+                        } else if ((event.x + (nb_bw / 2) >= bounds.xmax) && event.x < bounds.xmax) {
                             return 2;
-                        } else if (x > rightFastThreshold) {
+                        } else if (event.x >= bounds.xmax) {
                             return 3;
                         } else {
                             return 4;
@@ -553,17 +553,20 @@ angular.module('rtl-plots', ['SubscriptionSocketService', 'toastr'])
                     if (scope.tuneContext) {
                         scope.tuneContext.handleTune = function () {
                             var bounds = currentZoomBounds();
-                            if (target_freq - nb_bw >= bounds.xmin && target_freq + nb_bw <= bounds.xmax) {
-                                if_cf = target_freq - rf_cf;
+                            if (target_freq - (nb_bw / 2) >= Math.max(bounds.xmin, scope.tuneContext.minWidebandSpectrum) &&
+                                target_freq + (nb_bw / 2) <= Math.min(bounds.xmax, scope.tuneContext.maxWidebandSpectrum)) {
+                                if (rf_cf - (nb_bw / 2) < bounds.xmin || rf_cf + (nb_bw / 2) > bounds.xmax) {
+                                    rf_cf = target_freq;
+                                    if_cf = 0;
+                                } else  {
+                                    if_cf = target_freq - rf_cf;
+                                }
                             } else {
                                 rf_cf = target_freq;
                                 if_cf = 0;
                             }
                             scope.doTune({rf_cf: rf_cf, if_cf: if_cf});
                             showHighlight(rf_cf);
-                            if (pan) {
-                                accordion.set_center(mx.pixel_to_real(activePlot._Mx, accordion_pixel_loc.x, accordion_pixel_loc.y).x);
-                            }
                             if (leftButton && rightButton) {
                                 updateButtons();
                             }
@@ -608,12 +611,13 @@ angular.module('rtl-plots', ['SubscriptionSocketService', 'toastr'])
 
                     //mark initial drag point
                     var plotMDownListener = function(event) {
-                        if (inAccordionBounds(event.x)) {
+                        if (inAccordionBounds(event.x) && event.which === 1) {
                             accordionDrag = true;
                             //Don't draw the warpbox while dragging the accordion
                             activePlot.change_settings({rubberbox_action: ""});
                             activePlot.addListener('mmove', accordionMoveListener);
                             ghostAccordion.set_center(event.x);
+                            ghostAccordion.set_visible(true);
                             return;
                         }
                         lastMouseDown.x = event.x;
@@ -626,11 +630,10 @@ angular.module('rtl-plots', ['SubscriptionSocketService', 'toastr'])
                             var lBounds = leftButton.bounds();
                             var rBounds = rightButton.bounds();
                             if (inRectangle(lBounds, event.xpos, event.ypos) || inRectangle(rBounds, event.xpos, event.ypos)) {
-                                console.log("CLICKED on BUTTON");
                                 return;
                             }
-                            ghostAccordion.set_center(-nb_bw);
-                            if (accordionDrag) {
+                            ghostAccordion.set_visible(false);
+                            if (accordionDrag && (event.which === 1 || lastUnzoomAfterTune(event.which))) {
                                 stopPan();
                                 target_freq = event.x;
                                 scope.tuneContext.handleTune();
@@ -667,24 +670,24 @@ angular.module('rtl-plots', ['SubscriptionSocketService', 'toastr'])
 
                     var accordionMoveListener = function(event) {
                         accordion.set_center(event.x);
-                        var boundaryProximity = plotBoundary(event.x);
-                        accordion_pixel_loc = mx.real_to_pixel(activePlot._Mx, event.x, event.y);
+                        accordion.set_width(nb_bw);
+                        var boundaryProximity = plotBoundary(event);
                         switch (boundaryProximity) {
                             case 0:
                                 pan_control = "left_fast";
-                                doPan();
+                                doPan(event);
                                 break;
                             case 1:
                                 pan_control = "left";
-                                doPan();
+                                doPan(event);
                                 break;
                             case 2:
                                 pan_control = "right";
-                                doPan();
+                                doPan(event);
                                 break;
                             case 3:
                                 pan_control = "right_fast";
-                                doPan();
+                                doPan(event);
                                 break;
                             default:
                                 pan_control = '';
@@ -692,7 +695,11 @@ angular.module('rtl-plots', ['SubscriptionSocketService', 'toastr'])
                         }
                     };
 
-                    var doPan = function() {
+                    var doPan = function(event) {
+                        accordion.set_mode('relative');
+                        var bounds = currentZoomBounds();
+                        accordion.set_center(event.xpos / (bounds.x2));
+                        accordion.set_width(nb_bw / (currentZoomBounds().xmax - currentZoomBounds().xmin));
                         if (pan) {
                             return;
                         }
@@ -726,8 +733,7 @@ angular.module('rtl-plots', ['SubscriptionSocketService', 'toastr'])
                             $interval.cancel(pan);
                             pan = undefined;
                             RedhawkNotificationService.enable(true);
-                            accordion_pixel_loc = undefined;
-                            ghostAccordion.set_center(-nb_bw);
+                            accordion.set_mode('absolute');
                         }
                     };
 

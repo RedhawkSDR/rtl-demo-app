@@ -17,6 +17,13 @@
  * You should have received a copy of the GNU Lesser General Public License
  * along with this program.  If not, see http://www.gnu.org/licenses/.
  */
+
+/* Override bootstrap popover class for wider help content */
+.popover {
+    max-width: 350px;
+    width: 350px;
+}
+
 .rhweb-page-title {
     padding: 10px;
     margin: 0;
@@ -55,7 +62,7 @@
 }
 
 .plotting-help-control {
-    width: 200px;
+    width: 300px;
     font-variant: small-caps;
     font-weight: bold;
     padding-top: 3px;

@@ -195,6 +195,10 @@ angular.module('rtl-rest', ['ngResource', 'ngAnimate', 'SubscriptionSocketServic
             rtl.survey = new Survey();
             rtl.device = new Device();
             rtl.rds = new Rds();
+            rtl.minDeviceFreq = 23.99e6;
+            rtl.maxdeviceFreq = 900e6;
+            rtl.minSimFreq = 87.99e6;
+            rtl.maxSimFreq = 108.01e6;
 
             var statusSocket = SubscriptionSocket.createNew();
 

@@ -91,6 +91,15 @@ angular.module('rtl-demo-controllers', ['rtl-rest'])
             $scope.$watch('device.status', function(status) {
                 $scope.ready = (status == 'ready');
             });
+            $scope.$watch('device.simulator', function(sim) {
+                if (sim) {
+                    $scope.tuneContext.minWidebandSpectrum = rtl.minSimFreq;
+                    $scope.tuneContext.maxWidebandSpectrum = rtl.maxSimFreq;
+                } else {
+                    $scope.tuneContext.minWidebandSpectrum = rtl.minDeviceFreq;
+                    $scope.tuneContext.maxWidebandSpectrum = rtl.maxdeviceFreq;
+                }
+            });
             $scope.$watch('survey.processing', function(processing) {
                 $scope.running = (processing != null);
             });
