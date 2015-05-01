@@ -26,7 +26,7 @@ angular.module('rtl-plots', ['SubscriptionSocketService', 'toastr'])
             positionClass: 'toast-bottom-right'
         });
     })
-    /*
+    /**
      * This service converts byte arrays into an array containing instances of
      * a specified TypedArray view.
      */
@@ -82,6 +82,9 @@ angular.module('rtl-plots', ['SubscriptionSocketService', 'toastr'])
             element.html('<div class="rtl-plots-error">Plotting is not supported by this browser.</div>');
         }
     }])
+    /**
+     * This service provides toast notification messages
+     */
     .service('RedhawkNotificationService', [
         'toastr',
         function(toastr){
@@ -122,6 +125,9 @@ angular.module('rtl-plots', ['SubscriptionSocketService', 'toastr'])
             };
         }
     ])
+/**
+ * The rtl-plot directive provides a plot that is configurable by various directive parameters
+ */
     .directive('rtlPlot', ['SubscriptionSocket', 'plotDataConverter', 'plotNotSupportedError', '$interval', 'RedhawkNotificationService',
         function(SubscriptionSocket, plotDataConverter, plotNotSupportedError, $interval, RedhawkNotificationService){
             return {
@@ -141,35 +147,44 @@ angular.module('rtl-plots', ['SubscriptionSocketService', 'toastr'])
                 },
                 template: '<div style="width: {{width}}; height: {{height}};" ></div>',
                 link: function (scope, element, attrs) {
+
                     if(!SubscriptionSocket.isSupported() || !SubscriptionSocket.isBinarySupported()) {
                         plotNotSupportedError(element);
                         return;
                     }
                     var plotSocket = SubscriptionSocket.createNew();
 
-                    //use one of the following two lines
-                    var RUBBERBOX_ACTION = 'zoom'; //left-click will zoom, ctr-left-click will do drag-tune (if enabled)
-                    //var RUBBERBOX_ACTION = 'select'; //left-click will do drag-tune (if enabled), ctr-left-click will zoom
+                    /** use one of the following two lines */
+                    var RUBBERBOX_ACTION = 'zoom'; //left-click will zoom, ctr-left-click will select (e.g. drag-tune, if enabled)
+                    //var RUBBERBOX_ACTION = 'select'; //left-click will select, ctr-left-click will zoom
 
+                    /**
+                     * only relevant when RUBBERBOX_ACTION == select. horizontal: select box unconstrained vertically
+                     * as it's dragged horizontally. vertical: unconstrained horizontally as it's drag vertically.
+                     * box: constrained horizontally and vertically by mouse drag
+                    */
                     var RUBBERBOX_MODE = 'horizontal';
 
+                    /** true when accordion is being dragged */
                     var accordionDrag = false;
 
+                    /** default behavior is to draw fill gradient beneath the line plot */
                     if(!angular.isDefined(scope.useGradient))
                         scope.useGradient = true;
 
-                    //wideband tuned frequency
+                    /** wideband tuned frequency */
                     var rf_cf;
 
-                    //narrowband IF
+                    /** IF offset from rf_cf for narrowband tuning */
                     var if_cf = 0;
 
+                    /** commanded frequency, to be converted to some combinaiuton of RF and IF values */
                     var target_freq;
 
-                    //narrowband bandwidth
+                    /** narrowband bandwidth */
                     var nb_bw = 100e3;
 
-                    //wideband bandwidth
+                    /** spectrum range on the wideband plot at the current zoom level */
                     var wb_bw;
 
                     /**
@@ -195,7 +210,7 @@ angular.module('rtl-plots', ['SubscriptionSocketService', 'toastr'])
                         }
                     }
 
-                    //sigplot objects
+                    /** sigplot objects */
                     var plot,
                         raster,
                         activePlot,
@@ -204,22 +219,32 @@ angular.module('rtl-plots', ['SubscriptionSocketService', 'toastr'])
 
                     var tunedWhileZoomed = false;
 
+                    /** used when auto-panning while holding the accordion at or beyond the plot edge */
                     var TUNE_STEP = 20e3;
-
                     var STEP_DELAY = 300;
 
+                    /** controls whether panning left, right, or not panning */
                     var pan_control = '';
 
+                    /** promise returned by angular $interval, presence indicates panning in progress */
                     var pan;
 
+                    /** buttons for tuning the wideband plot to the next higher or lower bandwidth segment */
                     var leftButton, rightButton;
 
+                    /** placeholder accordion drawn in the current tune location while dragging the accordion elsewhere */
                     var ghostAccordion;
 
-                    //Since freq is on MHz scale, we need some tolerance when comparing click-point to some value
+                    /** Since freq is on MHz scale, we need some tolerance when comparing click-point to a previous click-point for detecting a drag */
                     var clickTolerance = 200; //TODO set value automatically as a multiple of xdelta, to work with any data scale
 
-                    //settings used when plot is created. Will be overridden from received SRI
+                    /**************************************************************************************************
+                     *
+                     *                                     PLOT RENDERING
+                     *
+                     **************************************************************************************************/
+
+                    /** settings used when plot is created. Will be overridden from received SRI */
                     var defaultSettings = {
                         xdelta:10.25390625,
                         xstart: -1,//ensure change is detected with first SRI
@@ -232,20 +257,21 @@ angular.module('rtl-plots', ['SubscriptionSocketService', 'toastr'])
                         format: 'SF'
                     };
 
-                    //apply new values from SRI to this object
+                    /** apply new values from SRI to these objects */
                     scope.plotSettings = angular.copy(defaultSettings);
                     scope.rasterSettings = angular.copy(defaultSettings);
 
+                    /** plot display options */
                     var plotOptions = {
                         autohide_panbars: true,
                         autox: 3, //auto-scale min and max x values
                         autoy: 3, //auto-scale min and max y values
                         legend: false, //don't show legend of traces being plotted
                         all: true, //show all plot data, rather than partial range with pan bars
-                        cmode: cmode,
+                        cmode: cmode, //complex mode
                         xcnt: 'continuous',
-                        rubberbox_action: RUBBERBOX_ACTION,
-                        rubberbox_mode: RUBBERBOX_MODE, //horizontal mode not supported when rubberbox_action == 'zoom'
+                        rubberbox_action: RUBBERBOX_ACTION, //zoom or select
+                        rubberbox_mode: RUBBERBOX_MODE, //not relevant when rubberbox_action == 'zoom'
                         colors: {bg: "#222", fg: "#888"}
                     };
 
@@ -254,14 +280,14 @@ angular.module('rtl-plots', ['SubscriptionSocketService', 'toastr'])
                         angular.extend(plotOptions, {'autol': scope.autol});
                     }
 
-                    //Show readout (values under plot, updated as cursor moves) only for wideband plot
+                    /** Show readout (values under plot, updated as cursor moves) only for wideband plot */
                     if (scope.url.indexOf('psd/fm') >= 0 || scope.url.indexOf('psd/narrowband') >= 0) {
                         angular.extend(plotOptions, {'noreadout': true});
                     }
 
                     scope.element = element;
 
-                    //we have to wait until the plot's parent div is ready before drawing a plot in its canvas
+                    /** we have to wait until the plot's parent div is ready before drawing a plot in its canvas */
                     scope.$watch(function(scope) { return scope.element[0] },
                         function(e) {
                             if (!plot && (scope.plotType === 'line' || scope.plotType === 'dots')) {
@@ -293,6 +319,7 @@ angular.module('rtl-plots', ['SubscriptionSocketService', 'toastr'])
                             };
                         }
 
+                        /** draw a color gradient in the area under the line  for the line plot */
                         if(scope.useGradient) {
                             plot.change_settings({
                                 fillStyle: [
@@ -306,72 +333,9 @@ angular.module('rtl-plots', ['SubscriptionSocketService', 'toastr'])
 
                     };
 
-                    var addButtons = function(style) {
-                        var bounds = currentZoomBounds();
-                        var leftButtonPos = {
-                            x: bounds.x1 + 15,
-                            y: bounds.y1 + 15
-                        };
-                        var rightButtonPos = {
-                            x: bounds.x2 - 15,
-                            y: bounds.y1 + 15
-                        };
-                        var buttonSettings = {
-                            position: {x: leftButtonPos.x, y: leftButtonPos.y},
-                            direction: 'left',
-                            id: 'left'
-                        };
-                        if (style) {
-                            buttonSettings.strokeStyle = style;
-                        }
-                        leftButton = new sigplot.ButtonPlugin(buttonSettings);
-                        activePlot.add_plugin(leftButton, activePlotLayer + 3);
-                        leftButton.addListener('selectevt', leftButtonListener);
-                        buttonSettings = {
-                            position: {x: rightButtonPos.x, y: rightButtonPos.y},
-                            direction: 'right',
-                            id: 'right'
-                        };
-                        if (style) {
-                            buttonSettings.strokeStyle = style;
-                        }
-                        rightButton = new sigplot.ButtonPlugin(buttonSettings);
-                        activePlot.add_plugin(rightButton, activePlotLayer + 4);
-                        rightButton.addListener('selectevt', rightButtonListener);
-                    };
-
-                    var leftButtonListener = function(e) {
-                        if (e.id === 'left') {
-                            target_freq = Math.max(rf_cf - wb_bw, scope.tuneContext.minWidebandSpectrum + (nb_bw / 2));
-                            scope.tuneContext.handleTune();
-                        }
-                    };
-
-                    var rightButtonListener = function(e) {
-                        if (e.id === 'right') {
-                            target_freq = Math.min(rf_cf + wb_bw, scope.tuneContext.maxWidebandSpectrum - (nb_bw / 2));
-                            scope.tuneContext.handleTune();
-                        }
-                    };
-
-                    var inRectangle = function(rect, x, y) {
-                        return (x >= rect.x  && x <= rect.x + rect.width && y >= rect.y && y <= rect.y + rect.height);
-                    };
-
-                    var updateButtons = function() {
-                        leftButton.setEnabled(rf_cf - wb_bw / 2 >= scope.tuneContext.minWidebandSpectrum);
-                        rightButton.setEnabled(rf_cf + wb_bw / 2 <= scope.tuneContext.maxWidebandSpectrum);
-                    };
-
-                    var setPlotBounds = function() {
-                        var bounds = currentZoomBounds();
-                        wb_bw = bounds.xmax - bounds.xmin;
-                        console.log("SET WB BW " + wb_bw);
-                    };
-
                     var overlayPlot = function(overrides, options) {
                         options = options || {};
-                        var optionsCopy = angular.extend(options, {layerType: sigplot.Layer1D});
+                        angular.extend(options, {layerType: sigplot.Layer1D});
                         activePlotLayer = plot.overlay_array(null, overrides, options);
 
                         if (scope.url.indexOf('psd/wideband') >= 0) {
@@ -461,159 +425,85 @@ angular.module('rtl-plots', ['SubscriptionSocketService', 'toastr'])
                         }
                     };
 
+                    /**************************************************************************************************
+                     *
+                     *                                     PAN BUTTONS
+                     *
+                     **************************************************************************************************/
+
+                    /** Draw buttons on top left and right of plot, for stepping through the wideband spectrum */
+                    var addButtons = function(style) {
+                        var bounds = currentZoomBounds();
+                        var leftButtonPos = {
+                            x: bounds.x1 + 15,
+                            y: bounds.y1 + 15
+                        };
+                        var rightButtonPos = {
+                            x: bounds.x2 - 15,
+                            y: bounds.y1 + 15
+                        };
+                        var buttonSettings = {
+                            position: {x: leftButtonPos.x, y: leftButtonPos.y},
+                            direction: 'left',
+                            id: 'left'
+                        };
+                        if (style) {
+                            buttonSettings.strokeStyle = style;
+                        }
+                        leftButton = new sigplot.ButtonPlugin(buttonSettings);
+                        activePlot.add_plugin(leftButton, activePlotLayer + 3);
+                        leftButton.addListener('selectevt', leftButtonListener);
+                        buttonSettings = {
+                            position: {x: rightButtonPos.x, y: rightButtonPos.y},
+                            direction: 'right',
+                            id: 'right'
+                        };
+                        if (style) {
+                            buttonSettings.strokeStyle = style;
+                        }
+                        rightButton = new sigplot.ButtonPlugin(buttonSettings);
+                        activePlot.add_plugin(rightButton, activePlotLayer + 4);
+                        rightButton.addListener('selectevt', rightButtonListener);
+                    };
+
+                    var leftButtonListener = function(e) {
+                        if (e.id === 'left') {
+                            if (zoomLevel() > 1) {
+                                activePlot.unzoom();
+                            }
+                            target_freq = Math.max(rf_cf - wb_bw, scope.tuneContext.minWidebandSpectrum + (nb_bw / 2));
+                            scope.tuneContext.handleTune();
+                        }
+                    };
+
+                    var rightButtonListener = function(e) {
+                        if (e.id === 'right') {
+                            if (zoomLevel() > 1) {
+                                activePlot.unzoom();
+                            }
+                            target_freq = Math.min(rf_cf + wb_bw, scope.tuneContext.maxWidebandSpectrum - (nb_bw / 2));
+                            scope.tuneContext.handleTune();
+                        }
+                    };
+
+                    var updateButtons = function() {
+                        leftButton.setEnabled(rf_cf - wb_bw / 2 >= scope.tuneContext.minWidebandSpectrum);
+                        rightButton.setEnabled(rf_cf + wb_bw / 2 <= scope.tuneContext.maxWidebandSpectrum);
+                    };
+
+                    /**************************************************************************************************
+                     *
+                     *                                     PLOT LISTENERS
+                     *
+                     **************************************************************************************************/
+
+                    /** used to track successive clicks and detect drag action */
                     var lastMouseDown = {
                         x: undefined,
                         y: undefined
                     };
 
-                    var plotBoundary = function(event) {
-                        var bounds = currentZoomBounds();
-                        if (event.x <= bounds.xmin) {
-                            return 0;
-                        } else if (event.x - (nb_bw / 2) <= bounds.xmin) {
-                            return 1;
-                        } else if ((event.x + (nb_bw / 2) >= bounds.xmax) && event.x < bounds.xmax) {
-                            return 2;
-                        } else if (event.x >= bounds.xmax) {
-                            return 3;
-                        } else {
-                            return 4;
-                        }
-                    }
-
-                    /**
-                     * Determine if the user is unzooming to get back to the top zoom level, and a tune
-                     * event occurred while zoomed
-                     * @param {Number} button the mouse button that was pressed (1: left, 2L center, 3:right)
-                     * @returns {boolean} true if the plot is being returned to the top zoom level and a tune event
-                     * occurred while zoomed
-                     */
-                    var lastUnzoomAfterTune = function(button) {
-                        if (button === 3) { //right-click
-                            var zoom = zoomLevel();
-                            //stack will have two entries before last unzoom, the current zoomed level and the top level
-                            var retVal = (zoom === 2);
-                            if (retVal) {
-                                retVal = tunedWhileZoomed;
-                                tunedWhileZoomed = false;
-                            }
-                            return retVal;
-                        }
-                        return false;
-                    }
-                    /**
-                     * Return the current zoom level
-                     * @returns {Integer} 1 if the plot is unzoomed all the way, otherwise 1 + the number of zooms
-                     * that have occurred
-                     */
-                    var zoomLevel = function() {
-                        var zoomStack = activePlot._Mx.stk;
-                        return zoomStack.length;
-                    }
-
-                    /**
-                     * Determine whether a select or  zoom action is being performed with the current drag operation,
-                     * in accordance with the current rubberbox_action plot option setting.
-                     *
-                     * @param {Number} button the mouse button that is being pressed. 1: left; 2: middle; 3: right
-                     * @returns {boolean} true if a select action is being performed, false if a zoom action is being performed.
-                     */
-                    var dragSelect = function(button) {
-                        switch (RUBBERBOX_ACTION) {
-                            case 'select' :
-                                //true for left-click drag
-                                return button === 1 && scope.ctrlKeyPressed;
-                            case 'zoom' :
-                                //true for ctrl-left-click drag
-                                return button === 1 && !scope.ctrlKeyPressed;
-                            default:
-                                return false;
-                        }
-                    };
-
-                    /** Tune to freq value at center of rectangle. In applications where bandwidth is selectable
-                     * it can be set from width of rectangle. Here bandwidth is not selectable because we're dealing with
-                     * fixed-bandwidth FM broadcast signals.
-                     */
-                    var dragTune = function(event) {
-                        if (lastMouseDown.x && lastMouseDown.y) {
-                            var rect = {
-                                x1: lastMouseDown.x,
-                                x2: event.x,
-                                y1: lastMouseDown.y,
-                                y2: event.y
-                            };
-                            lastMouseDown = {x:undefined, y: undefined}; //reset initial drag-point
-                            target_freq = (rect.x1 + rect.x2) / 2;
-                            scope.tuneContext.handleTune();
-                            console.log("Tuned to sub-band from " + rect.x1 / 1000  + " KHz to " + rect.x2 / 1000 + " KHz");
-                        }
-                    };
-
-                    scope.$watch('form.frequency', function(freq) {
-                        target_freq = parseFloat(freq) * 1e6;
-                    });
-
-                    if (scope.tuneContext) {
-                        scope.tuneContext.handleTune = function () {
-                            var bounds = currentZoomBounds();
-                            if (target_freq - (nb_bw / 2) >= Math.max(bounds.xmin, scope.tuneContext.minWidebandSpectrum) &&
-                                target_freq + (nb_bw / 2) <= Math.min(bounds.xmax, scope.tuneContext.maxWidebandSpectrum)) {
-                                if (rf_cf - (nb_bw / 2) < bounds.xmin || rf_cf + (nb_bw / 2) > bounds.xmax) {
-                                    rf_cf = target_freq;
-                                    if_cf = 0;
-                                } else  {
-                                    if_cf = target_freq - rf_cf;
-                                }
-                            } else {
-                                rf_cf = target_freq;
-                                if_cf = 0;
-                            }
-                            scope.doTune({rf_cf: rf_cf, if_cf: if_cf});
-                            showHighlight(rf_cf);
-                            if (leftButton && rightButton) {
-                                updateButtons();
-                            }
-                        };
-                    }
-
-                    /**
-                     * Determine whether the specified x value is within the bounds of the plot accordion
-                     * @param x the Real World Coordinate (RWC) X value
-                     * @returns {boolean} true if x is within the bounds of the plot accordion
-                     */
-                    var inAccordionBounds = function(x) {
-                        if (accordion) {
-                            var min = accordion.get_center() - nb_bw / 2;
-                            var max = accordion.get_center() + nb_bw / 2;
-                            return x >= min && x <= max;
-                        }
-                        return false;
-                    };
-
-                    /**
-                     * Plot min/max values go beyond the plot boundary, to include the area where labels, etc are displayed.
-                     * Here we detect whether clicking on actual plot or surrounding area.
-                     */
-                    var inPlotBounds = function(x, y) {
-                        var bounds = currentZoomBounds();
-                        var xmin = bounds.xmin;
-                        var xmax = bounds.xmax;
-                        var ymin = bounds.ymin;
-                        var ymax = bounds.ymax;
-                        // Use >= and <= because when clicking on any x position > xmax, x will be set to xmax. Same for y values
-                        if (x >= xmax || x <= xmin || y >= ymax || y <= ymin) {
-                            return false;
-                        }
-                        return true;
-                    };
-
-                    var currentZoomBounds = function() {
-                        //zoom stack remembers min/max values at each zoom level, with current zoom values at end of stack
-                        return activePlot._Mx.stk[activePlot._Mx.stk.length - 1];
-                    }
-
-                    //mark initial drag point
+                    /** mark initial drag point */
                     var plotMDownListener = function(event) {
                         if (inAccordionBounds(event.x) && event.which === 1) {
                             accordionDrag = true;
@@ -628,50 +518,73 @@ angular.module('rtl-plots', ['SubscriptionSocketService', 'toastr'])
                         lastMouseDown.y = event.y;
                     };
 
-                    //Compare with initial drag-point to get user-specified rectangle
+                    /** Handle click-tune, drag tune (if enabled), zoom/unzoom, and accordion drag*/
                     var plotMupListener = function(event) {
                         if (scope.url.indexOf('psd/wideband') >= 0) {
+                            /** enable buttons if unzooming to top level */
+                            if (event.which === 3) {
+                                var enableButtons = (zoomLevel() <= 2);
+                                rightButton.setEnabled(enableButtons);
+                                leftButton.setEnabled(enableButtons);
+                            }
+
+                            /** avoid tuning if user clicked on one of the buttons */
                             var lBounds = leftButton.bounds();
                             var rBounds = rightButton.bounds();
                             if (inRectangle(lBounds, event.xpos, event.ypos) || inRectangle(rBounds, event.xpos, event.ypos)) {
                                 return;
                             }
-                            ghostAccordion.set_visible(false);
-                            if (accordionDrag && (event.which === 1 || lastUnzoomAfterTune(event.which))) {
+
+                            /** hide the ghost accordion, if an accordion drag is being concluded */
+                            if (accordionDrag) {
+                                ghostAccordion.set_visible(false);
+                            }
+                            if (accordionDrag && (event.which === 1)) {
                                 stopPan();
-                                target_freq = event.x;
-                                scope.tuneContext.handleTune();
                                 accordionDrag = false;
                                 activePlot.removeListener('mmove', accordionMoveListener);
                                 activePlot.change_settings({rubberbox_action: RUBBERBOX_ACTION});
+                                target_freq = event.x;
+                                scope.tuneContext.handleTune();
                                 return;
+                            }
+                            if  (lastUnzoomAfterTune(event.which)) {
+                                reloadSri = true;
                             }
                         }
 
-                        //event.which==> 1=left-click, 2=middle-click, 3=right-click
-                        /*tune if left-click or if unzooming to top level after tuning while zoomed.*/
+                        /** Compare with initial drag-point to get user-specified rectangle*/
+
+                        /** event.which==> 1=left-click, 2=middle-click, 3=right-click
+                         *  tune if left-click or if unzooming to top level after tuning while zoomed.*/
                         if (Math.abs(event.x - lastMouseDown.x) <= clickTolerance && (event.which === 1 || lastUnzoomAfterTune(event.which))) {
                             if (inPlotBounds(event.x, event.y) && !scope.ctrlKeyPressed) {
                                 console.log("Tuned to " + event.x / 1000 + " KHz");
-                                if (zoomLevel() > 2) {
+                                if (zoomLevel() >= 2) {
                                     tunedWhileZoomed = true;
                                 }
                                 target_freq = event.x;
-                                if (event.which === 3) {
-                                    //re-tune to the value specified while zoomed, to re-scale the plot
-                                    target_freq = rf_cf + if_cf;
-                                    activePlot.refresh();
-                                }
                                 if (scope.tuneContext) {
                                     scope.tuneContext.handleTune();
+                                    activePlot.refresh();
                                 }
                             }
-                        } else if (Math.abs(event.x - lastMouseDown.x) >= clickTolerance && dragSelect(event.which)) {
-                            //Drag tune disabled for this application because it doesn't make sense with fixed bandwidth signals
-                            //dragTune(event);
+                        } else if (Math.abs(event.x - lastMouseDown.x) >= clickTolerance) {
+                            if (dragSelect(event.which)) {
+                                //Drag tune disabled for this application because it doesn't make sense with fixed bandwidth signals
+                                //dragTune(event);
+                            } else {
+                                //disable buttons if zooming
+                                rightButton.setEnabled(false);
+                                leftButton.setEnabled(false);
+                            }
                         }
                     };
-
+                    /**
+                     * Pan slowly left or right if accordion is held at one of the plot edges.
+                     * Pan faster if accordion is held beyond one of the plot edges.
+                     * @param event mouse move event
+                     */
                     var accordionMoveListener = function(event) {
                         accordion.set_center(event.x);
                         accordion.set_width(nb_bw);
@@ -699,7 +612,70 @@ angular.module('rtl-plots', ['SubscriptionSocketService', 'toastr'])
                         }
                     };
 
+                    /**************************************************************************************************
+                     *
+                     *                                     TUNE CONTROL
+                     *
+                     **************************************************************************************************/
+
+                    /** Tune to freq value at center of rectangle. In applications where bandwidth is selectable
+                     * it can be set from width of rectangle. Here bandwidth is not selectable because we're dealing with
+                     * fixed-bandwidth FM broadcast signals.
+                     */
+                    var dragTune = function(event) {
+                        if (lastMouseDown.x && lastMouseDown.y) {
+                            var rect = {
+                                x1: lastMouseDown.x,
+                                x2: event.x,
+                                y1: lastMouseDown.y,
+                                y2: event.y
+                            };
+                            lastMouseDown = {x:undefined, y: undefined}; //reset initial drag-point
+                            target_freq = (rect.x1 + rect.x2) / 2;
+                            scope.tuneContext.handleTune();
+                            console.log("Tuned to sub-band from " + rect.x1 / 1000  + " KHz to " + rect.x2 / 1000 + " KHz");
+                        }
+                    };
+
+                    scope.$watch('form.frequency', function(freq) {
+                        target_freq = parseFloat(freq) * 1e6;
+                    });
+                    /**
+                     * tuneContext created in rtl-demo-controllers.js and used to pass data between the
+                     * controller and this directive. Also enables overview.html to invoke handleTune()
+                     */
+                    if (scope.tuneContext) {
+                        /**
+                         *  Manages the wide band and narrow band tune actions based on the requested tune frequency
+                         *  and the RF and IF frequencies currently selected
+                         */
+                        scope.tuneContext.handleTune = function () {
+                            var bounds = currentZoomBounds();
+                            if (target_freq - (nb_bw / 2) >= Math.max(bounds.xmin, scope.tuneContext.minWidebandSpectrum) &&
+                                target_freq + (nb_bw / 2) <= Math.min(bounds.xmax, scope.tuneContext.maxWidebandSpectrum)) {
+                                if (rf_cf - (nb_bw / 2) < bounds.xmin || rf_cf + (nb_bw / 2) > bounds.xmax) {
+                                    rf_cf = target_freq;
+                                    if_cf = 0;
+                                } else  {
+                                    if_cf = target_freq - rf_cf;
+                                }
+                            } else {
+                                rf_cf = target_freq;
+                                if_cf = 0;
+                            }
+                            scope.doTune({rf_cf: rf_cf, if_cf: if_cf});
+                            showHighlight(rf_cf);
+                            if (leftButton && rightButton) {
+                                updateButtons();
+                            }
+                        };
+                    }
+                    /** start panning if not yet panning. Otherwise move the accordion to the
+                     * pixel-relative location of the mouse
+                     * @param event mouse move event
+                     */
                     var doPan = function(event) {
+                        /** specify center and width as percentage of plot bounds */
                         accordion.set_mode('relative');
                         var bounds = currentZoomBounds();
                         accordion.set_center((event.xpos - bounds.x1) / (bounds.x2 - bounds.x1));
@@ -707,6 +683,7 @@ angular.module('rtl-plots', ['SubscriptionSocketService', 'toastr'])
                         if (pan) {
                             return;
                         }
+                        /** we don't to flood the UI with notifications while panning */
                         RedhawkNotificationService.enable(false);
                         pan = $interval(function() {
                                 if (!pan) {
@@ -737,12 +714,13 @@ angular.module('rtl-plots', ['SubscriptionSocketService', 'toastr'])
                             $interval.cancel(pan);
                             pan = undefined;
                             RedhawkNotificationService.enable(true);
+                            /** now we set width and center in real world coordinates again */
                             accordion.set_mode('absolute');
                         }
                     };
 
                     /**
-                     * Show subband tuning by adding a feature to the plot which draws a different color trace
+                     * Show sub-band tuning by adding a feature to the plot which draws a different color trace
                      * for data in a specified x-value range
                      */
                     var showHighlight = function (cf) {
@@ -775,6 +753,12 @@ angular.module('rtl-plots', ['SubscriptionSocketService', 'toastr'])
 
                     };
 
+                    /**************************************************************************************************
+                     *
+                     *                                     PLOT UPDATE
+                     *
+                     **************************************************************************************************/
+
                     /** When SRI has changed, plot settings will be updated with next push of data **/
                     var reloadSri;
 
@@ -784,7 +768,7 @@ angular.module('rtl-plots', ['SubscriptionSocketService', 'toastr'])
                     /** String value used as part of format string: S = scalar data, C = complex data  **/
                     var mode;
 
-                    /**
+                    /***
                      * Detect changed values from SRI and apply to plot
                      */
                     var updatePlotSettings = function(data) {
@@ -843,7 +827,7 @@ angular.module('rtl-plots', ['SubscriptionSocketService', 'toastr'])
 
                         if (mode) {
 
-                            // format string = (C|S)(F|D|I) for scalar/complex data containing Float/Double/Short values
+                            /** format string = (C|S)(F|D|I) for scalar/complex data containing Float/Double/Short values */
                             var format = '';
                             switch (scope.type) {
                                 case "float":
@@ -876,7 +860,7 @@ angular.module('rtl-plots', ['SubscriptionSocketService', 'toastr'])
                         }
                     };
 
-                    //SRI = Signal Related Information: signal metadata, pushed from server initially and when values change
+                    /** SRI = Signal Related Information: signal metadata, pushed from server initially and when values change */
                     var on_sri = function(sri) {
                         updatePlotSettings(sri);
                     };
@@ -884,25 +868,25 @@ angular.module('rtl-plots', ['SubscriptionSocketService', 'toastr'])
                     var dataConverter = plotDataConverter(scope.type);
                     var lastDataSize;
 
-                    /* Server pushes data one frame at a time */
+                    /** Server pushes data one frame at a time */
                     var on_data = function(data) {
 
-                        /*bpa and ape not currently used. Useful if we need to identify frame boundaries in data.
+                        /**
+                         * bpa and ape not currently used. Useful if we need to identify frame boundaries in data.
+                         * Number of raw bytes = subsize (from SRI) * bytes per element (BPE).
+                         * BPE = number of bytes per atom (BPA) * atoms per element (APE)
+                         * BPA = bytes needed to represent a value, i.e 2 for float, 4 for double
+                         * APE = 1 for scalar data, 2 for complex
 
-                         Number of raw bytes = subsize (from SRI) * bytes per element (BPE).
-                         BPE = number of bytes per atom (BPA) * atoms per element (APE)
-                         BPA = bytes needed to represent a value, i.e 2 for float, 4 for double
-                         APE = 1 for scalar data, 2 for complex
-
-                         Complex data can be plotted in various complex output modes, i.e. magnitude
-                         of complex number (sqrt(real** + imag**)), sum of real and imaginary components,
-                         separate trace for real and imaginary values, etc.
+                         * Complex data can be plotted in various complex output modes, i.e. magnitude
+                         * of complex number (sqrt(real** + imag**)), sum of real and imaginary components,
+                         * separate trace for real and imaginary values, etc.
                          */
 
                         var bpa;
                         switch (scope.type) {
                             case 'double':
-                                bpa = 2;
+                                bpa = 8;
                                 break;
                             case 'float':
                                 bpa = 4;
@@ -926,10 +910,10 @@ angular.module('rtl-plots', ['SubscriptionSocketService', 'toastr'])
                                 return;
                         }
 
-                        //bytes per element. There will be bpe * subsize raw bytes per frame.
+                        /** bytes per element. There will be bpe * subsize raw bytes per frame. */
                         var bpe = bpa * ape;
 
-                        //assume single frame per handler invocation
+                        /** assume single frame per handler invocation */
                         var array = dataConverter(data);
                         lastDataSize = array.length;
                         if (activePlot) {
@@ -990,6 +974,131 @@ angular.module('rtl-plots', ['SubscriptionSocketService', 'toastr'])
                     scope.$on("$destroy", function(){
                         plotSocket.close();
                     })
+
+                    /**************************************************************************************************
+                     *
+                     *                                   COMMON HELPER FUNCTIONS
+                     *
+                     **************************************************************************************************/
+
+
+                   /** Set wide band bandwidth baed on RWC of the plot at the current zoom level */
+                    var setPlotBounds = function() {
+                        var bounds = currentZoomBounds();
+                        wb_bw = bounds.xmax - bounds.xmin;
+                    };
+
+                    var inRectangle = function(rect, x, y) {
+                        return (x >= rect.x  && x <= rect.x + rect.width && y >= rect.y && y <= rect.y + rect.height);
+                    };
+
+                    /**
+                     * Determines the location of the mouse in terms of pre-defined x-value regions
+                     * @param {object} event mouse move event
+                     * @returns {number} 0 if mouse is to left of plot, 1 if mouse is within one
+                     * accordion width of the left edge, 2 if mouse is withing one accordion width
+                     * of the right edge, 3 if mouse is to right of plot, 4 otherwise
+                     */
+                    var plotBoundary = function(event) {
+                        var bounds = currentZoomBounds();
+                        if (event.x <= bounds.xmin) {
+                            return 0;
+                        } else if (event.x - (nb_bw / 2) <= bounds.xmin) {
+                            return 1;
+                        } else if ((event.x + (nb_bw / 2) >= bounds.xmax) && event.x < bounds.xmax) {
+                            return 2;
+                        } else if (event.x >= bounds.xmax) {
+                            return 3;
+                        } else {
+                            return 4;
+                        }
+                    }
+
+                    /**
+                     * Determine if the user is unzooming to get back to the top zoom level, and a tune
+                     * event occurred while zoomed
+                     * @param {Number} button the mouse button that was pressed (1: left, 2L center, 3:right)
+                     * @returns {boolean} true if the plot is being returned to the top zoom level and a tune event
+                     * occurred while zoomed
+                     */
+                    var lastUnzoomAfterTune = function(button) {
+                        if (button === 3) { //right-click
+                            var zoom = zoomLevel();
+                            //stack will have two entries before last unzoom, the current zoomed level and the top level
+                            var retVal = (zoom === 2);
+                            if (retVal) {
+                                retVal = tunedWhileZoomed;
+                                tunedWhileZoomed = false;
+                            }
+                            return retVal;
+                        }
+                        return false;
+                    }
+                    /**
+                     * Determine the current zoom level
+                     * @returns {Integer} 1 if the plot is unzoomed all the way, otherwise 1 + the number of zooms
+                     * that have occurred
+                     */
+                    var zoomLevel = function() {
+                        var zoomStack = activePlot._Mx.stk;
+                        return zoomStack.length;
+                    }
+
+                    /**
+                     * Determine whether a select or  zoom action is being performed with the current drag operation,
+                     * in accordance with the current rubberbox_action plot option setting.
+                     *
+                     * @param {Number} button the mouse button that is being pressed. 1: left; 2: middle; 3: right
+                     * @returns {boolean} true if a select action is being performed, false if a zoom action is being performed.
+                     */
+                    var dragSelect = function(button) {
+                        switch (RUBBERBOX_ACTION) {
+                            case 'select' :
+                                //select is true when left-click drag occurs
+                                return button === 1;
+                            case 'zoom' :
+                                //select is true when ctrl-left-click drag occurs
+                                return (button === 1) && scope.ctrlKeyPressed;
+                            default:
+                                return false;
+                        }
+                    };
+
+                    /**
+                     * Determine whether the specified x value is within the bounds of the plot accordion
+                     * @param x the Real World Coordinate (RWC) X value
+                     * @returns {boolean} true if x is within the bounds of the plot accordion
+                     */
+                    var inAccordionBounds = function(x) {
+                        if (accordion) {
+                            var min = accordion.get_center() - nb_bw / 2;
+                            var max = accordion.get_center() + nb_bw / 2;
+                            return x >= min && x <= max;
+                        }
+                        return false;
+                    };
+
+                    /**
+                     * Plot min/max values go beyond the plot boundary, to include the area where labels, etc are displayed.
+                     * Here we detect whether clicking on actual plot or surrounding area.
+                     */
+                    var inPlotBounds = function(x, y) {
+                        var bounds = currentZoomBounds();
+                        var xmin = bounds.xmin;
+                        var xmax = bounds.xmax;
+                        var ymin = bounds.ymin;
+                        var ymax = bounds.ymax;
+                        // Use >= and <= because when clicking on any x position > xmax, x will be set to xmax. Same for y values
+                        if (x >= xmax || x <= xmin || y >= ymax || y <= ymin) {
+                            return false;
+                        }
+                        return true;
+                    };
+
+                    var currentZoomBounds = function() {
+                        /** zoom stack remembers min/max values at each zoom level, with current zoom values at end of stack */
+                        return activePlot._Mx.stk[activePlot._Mx.stk.length - 1];
+                    }
 
                 }
             };
