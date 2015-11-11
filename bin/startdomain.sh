@@ -111,7 +111,12 @@ pids=
 trap 'killif $pids' 0 1 2 15
 
 if [ ! -f "$SDRROOT/dev/$GPP_NODE" ]; then
-  ${SDRROOT}/dev/devices/GPP/python/nodeconfig.py --domainname=${RHDOMAIN} --nodename=${GPP_NODE_NAME} || err
+  # Older redhawk < 2.0 used a python based GPP and nodeconfig
+  if [ -f "${SDRROOT}/dev/devices/GPP/python/nodeconfig.py" ]; then
+    ${SDRROOT}/dev/devices/GPP/python/nodeconfig.py --domainname=${RHDOMAIN} --nodename=${GPP_NODE_NAME} || err
+  else
+    ${SDRROOT}/dev/devices/GPP/cpp/create_node.py --domainname=${RHDOMAIN} --nodename=${GPP_NODE_NAME} || err
+  fi
 fi
 
 #NBARGS=--force-rebind --nopersist
