@@ -474,10 +474,19 @@ class RTLApp(object):
         port = self._get_component('ArbitraryRateResampler_1').getPort('dataFloat_out')
         self._bulkio_bridges[RTLApp.PORT_TYPE_AUDIO_RAW].connectPort(port, AsyncPort.PORT_TYPE_FLOAT)
 
-        port = self._get_component('psk_soft_1').getPort('dataFloat_out')
+        # The port names have changed slightly between REDHAWK 1.10 and REDHAWK 2.0.
+        try:
+            port = self._get_component('psk_soft_1').getPort('dataFloat_out')
+        except:
+            port = self._get_component('psk_soft_1').getPort('softDecision_dataFloat_out')
+
         self._bulkio_bridges[RTLApp.PORT_TYPE_PSK_FLOAT].connectPort(port, AsyncPort.PORT_TYPE_FLOAT)
 
-        port = self._get_component('psk_soft_1').getPort('dataShort_out')
+        try:
+            port = self._get_component('psk_soft_1').getPort('dataShort_out')
+        except:
+            port = self._get_component('psk_soft_1').getPort('bits_dataShort_out')
+
         self._bulkio_bridges[RTLApp.PORT_TYPE_PSK_SHORT].connectPort(port, AsyncPort.PORT_TYPE_SHORT)
 
     def _close_psd_listeners(self):
