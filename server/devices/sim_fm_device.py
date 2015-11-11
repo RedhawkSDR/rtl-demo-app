@@ -27,6 +27,7 @@ from ossie.cf import StandardEvent, ExtendedEvent, CF
 from ossie.properties import props_from_dict, props_to_dict
 
 SIM_ID = 'DCE:3d441470-8e96-4583-bef6-277446048814'
+SIM_ID2 = 'FmRdsSimulator_1'
 SIM_NAME = 'FmRdsSimulator'
 
 class DeviceNotFoundError(StandardError): pass
@@ -44,7 +45,8 @@ class sim_FM_Device(object):
       domainptr = domain
 
     for dev in domainptr.devices:
-      if SIM_ID == dev._get_identifier():
+      # 1.10 a DCE was used, in 2.0 the node has a human readable name
+      if SIM_ID == dev._get_identifier() or SIM_ID2 == dev._get_identifier():
         return sim_FM_Device(dev)
 
     raise DeviceNotFoundError(SIM_NAME)

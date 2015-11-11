@@ -27,6 +27,7 @@ from ossie.cf import StandardEvent, ExtendedEvent, CF
 from ossie.properties import props_from_dict, props_to_dict
 
 RTL_ID = 'DCE:48ae5916-ea8a-4614-bc41-0380d26b8e70'
+RTL_ID2 = 'RTL2832U_1'
 RTL_NAME = 'RTL2832U'
 
 class DeviceNotFoundError(StandardError): pass
@@ -44,7 +45,8 @@ class RTL2832U(object):
             domainptr = domain
             
         for dev in domainptr.devices:
-            if RTL_ID == dev._get_identifier():
+            # 1.10 a DCE was used, in 2.0 the node has a human readable name
+            if RTL_ID == dev._get_identifier() or RTL_ID2 == dev._get_identifier():
                 return RTL2832U(dev)
         
         raise DeviceNotFoundError(RTL_NAME)
